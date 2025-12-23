@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    // General
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "target": "ESNext",
+
+    // Modules
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "isolatedModules": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+
+    // Type Checking & Safety
+    "strict": true,
+    "types": ["vite/client"],
+
+    // Paths
+    "rootDir": "./",
+    "baseUrl": "./",
+    "paths": {
+      "@assets/*": ["./src/assets/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@consts": ["./src/consts/index.ts"],
+      "@enums": ["./src/enums/index.ts"],
+      "@types": ["./src/types/index.ts"],
+      "@utils": ["./src/utils/index.ts"],
+      "@images": ["./src/assets/images"],
+      "@interfaces": ["./src/interfaces/index.ts"],
+      "@contexts": ["./src/contexts/index.ts"],
+      "@services": ["./src/services/index.ts"],
+      "@components/*": ["./src/components/*"],
+      "@layouts": ["./src/layouts/index.ts"]
+    }
+  }
+}
