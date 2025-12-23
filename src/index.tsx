@@ -1,10 +1,8 @@
 /* @refresh reload */
 import "@assets/styles/globals.css";
-import "@assets/styles/noscript.css";
 import { render } from 'solid-js/web';
 import 'solid-devtools';
 
-// import fontawesome library
 import '@fortawesome/fontawesome-free/css/all.min.css';
 import '@fortawesome/fontawesome-free/js/fontawesome.min.js';
 import "@fortawesome/fontawesome-free/js/brands.min.js";

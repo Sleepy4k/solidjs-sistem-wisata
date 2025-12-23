@@ -9,8 +9,8 @@ const App: Component = () => {
       root={(props) => (
         <Suspense
           fallback={
-            <div class="flex justify-center items-center h-screen">
-              <span class="loading loading-ring loading-lg h-32 w-32 border-t-2 border-b-2" />
+            <div class="flex justify-center items-center h-screen bg-gray-100">
+              <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
             </div>
           }
         >
