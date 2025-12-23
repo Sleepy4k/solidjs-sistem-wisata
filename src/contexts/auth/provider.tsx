@@ -1,10 +1,10 @@
 import AuthContext from "./context";
 import { useLocation, useNavigate } from "@solidjs/router";
-import { createSignal, createEffect, Component } from "solid-js";
+import { createSignal, createEffect, Component, Show } from "solid-js";
 import { EMAIL_KEY_PREFIX, TOKEN_KEY_PREFIX } from "@consts";
 import { IAuthUserData, IProviderProp } from "./interface";
-import { EAuthUpdateCategory } from "@enums";
-import { LocalStorage } from "@utils";
+import { EAuthUpdateCategory, EDebugType } from "@enums";
+import { LocalStorage, println } from "@utils";
 import { api } from "@services";
 
 const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
@@ -43,10 +43,6 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
   };
 
   createEffect(() => {
-    checkIsLogged();
-  });
-
-  const checkIsLogged = async () => {
     if (isLogged() || checked()) return;
 
     const token = LocalStorage.getItem(TOKEN_KEY_PREFIX);
@@ -55,60 +51,68 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
     if (!token || !email) {
       setChecked(true);
       setIsLogged(false);
-      [TOKEN_KEY_PREFIX, EMAIL_KEY_PREFIX].forEach((key) => {
-        LocalStorage.removeItem(key);
-      });
       navigate("/login", { replace: true });
       return;
     }
 
     const oldPath = location.pathname;
-    const oldQuery = location.query;
     const oldState = location.state;
 
-    await api
-      .post("/check-session")
-      .then(async (response) => {
-        const data = response.data;
+    const loadSession = async () => {
+      await api
+        .post("/check-session")
+        .then(async (response) => {
+          const { active, reason, valid_until } = response.data;
 
-        if (!data.active) {
-          throw new Error("Inactive session");
-        }
+          if (!active) {
+            throw new Error(reason || "Inactive session");
+          }
 
-        if (data.valid_until < 60) {
-          throw new Error("Expired session");
-        }
+          if (valid_until < 60) {
+            throw new Error("Expired session");
+          }
 
-        await api
-          .post("/dashboard/profile")
-          .then((res) => {
-            const userData = res.data.data;
-            setUser(userData);
-            setIsLogged(true);
+          await api
+            .get("/dashboard/profile")
+            .then((res) => {
+              const userData = res.data.data;
+              setUser(userData);
+              setIsLogged(true);
 
-            if (location.pathname == oldPath) return;
+              if (location.pathname == oldPath) return;
 
-            const fixedPath = oldQuery ? `${oldPath}?${oldQuery}` : oldPath;
+              navigate(oldPath, { replace: true, state: oldState });
+            })
+            .catch(() => {
+              throw new Error("Failed to fetch user data");
+            });
+        })
+        .catch((error) => {
+          println("Session check error:", error.message, EDebugType.ERROR);
+          logoutUser();
+        })
+        .finally(() => {
+          setChecked(true);
+        });
+    };
 
-            navigate(fixedPath, { replace: true, state: oldState });
-          })
-          .catch(() => {
-            throw new Error("Failed to fetch user data");
-          });
-      })
-      .catch(() => {
-        logoutUser();
-      })
-      .finally(() => {
-        setChecked(true);
-      });
-  };
+    loadSession();
+  });
 
   return (
     <AuthContext.Provider
-      value={{ user, isLogged, authToken, updateData, logoutUser }}
+      value={{ user, isLogged, authToken, updateData, logoutUser, checked }}
     >
-      {props.children}
+      <Show
+        when={checked()}
+        fallback={
+          <div class="flex justify-center items-center h-screen bg-gray-100">
+            <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        }
+      >
+        {props.children}
+      </Show>
     </AuthContext.Provider>
   );
 };

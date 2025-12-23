@@ -20,6 +20,7 @@ interface IAuthContext {
   authToken: Accessor<string>;
   updateData: (category: EAuthUpdateCategory, data: any) => void;
   logoutUser: () => void;
+  checked: Accessor<boolean>;
 }
 
 export type {
