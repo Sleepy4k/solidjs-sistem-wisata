@@ -16,9 +16,7 @@ export default function ErrorLayout(props: IErrorLayoutProp) {
 
   return (
     <div class="flex items-center justify-center min-h-screen bg-gray-100">
-      <div class="text-center">
-        {props.children}
-      </div>
+      <div class="text-center">{props.children}</div>
     </div>
   );
 }
