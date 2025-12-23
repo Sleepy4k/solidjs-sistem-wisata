@@ -3,15 +3,18 @@ import { BACKEND_URL, EMAIL_KEY_PREFIX, TOKEN_KEY_PREFIX } from "@consts";
 import { LocalStorage, println } from "@utils";
 import { EDebugType } from "@enums";
 
-const userToken = LocalStorage.getItem(TOKEN_KEY_PREFIX);
-
 const api = axios.create({
   baseURL: BACKEND_URL,
   headers: {
     Accept: "application/json",
     "Content-Type": "application/json",
-    Authorization: userToken ? `Bearer ${userToken}` : "",
   },
+});
+
+api.interceptors.request.use((config) => {
+  const userToken = LocalStorage.getItem(TOKEN_KEY_PREFIX);
+  config.headers.Authorization = userToken ? `Bearer ${userToken}` : "";
+  return config;
 });
 
 api.interceptors.response.use(

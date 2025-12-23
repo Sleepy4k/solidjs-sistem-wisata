@@ -1,6 +1,15 @@
-import { createEffect, createSignal } from "solid-js";
+import { A } from "@solidjs/router";
+import { createEffect, onMount } from "solid-js";
 
-export default function Header() {
+interface IHeaderProp {
+  name?: string;
+  email?: string;
+}
+
+export default function Header(props: IHeaderProp) {
+  let profileDropdown: HTMLDivElement,
+    profileButton: HTMLButtonElement,
+    logoutButton: HTMLButtonElement;
   let currentDate: string = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     year: "numeric",
@@ -19,6 +28,19 @@ export default function Header() {
     }, 60000);
 
     return () => clearInterval(interval);
+  });
+
+  onMount(() => {
+    profileButton.addEventListener("click", () => {
+      profileDropdown.classList.toggle("hidden");
+    });
+
+    logoutButton.addEventListener("click", () => {
+      const logoutModal = document.getElementById(
+        "logout-modal"
+      ) as HTMLDivElement;
+      logoutModal.classList.remove("hidden");
+    });
   });
 
   return (
@@ -41,16 +63,6 @@ export default function Header() {
                 ></path>
               </svg>
             </button>
-
-            {/* {showBreadcrumb && (
-          <nav class="flex items-center text-sm text-gray-500">
-            <a href="/" class="hover:text-gray-700 transition-colors">Dashboard</a>
-            <svg class="w-4 h-4 mx-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-            </svg>
-            <span class="text-gray-900">{title}</span>
-          </nav>
-        )} */}
           </div>
 
           <div class="flex items-center gap-3">
@@ -72,38 +84,73 @@ export default function Header() {
               <span class="font-medium">{currentDate}</span>
             </div>
 
-            <div class="relative bg-gray-50 border border-gray-200 rounded-lg p-1">
-              <button class="flex items-center gap-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all duration-200">
+            <div class="relative p-1">
+              <button
+                class="flex items-center gap-2 p-2 text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all duration-200 cursor-pointer"
+                ref={(el) => (profileButton = el)}
+              >
                 <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                  <span class="text-white text-sm font-medium">A</span>
+                  <span class="text-white text-sm font-medium">
+                    {props.name ? props.name.charAt(0).toUpperCase() : "A"}
+                  </span>
                 </div>
               </button>
 
               <div
-                class="absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-2 hidden"
-                id="profile-dropdown"
+                class="absolute right-0 top-full mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-1 hidden transition-all duration-200"
+                ref={(el) => (profileDropdown = el)}
               >
-                <div class="px-4 py-2 border-b border-gray-100">
-                  <p class="text-sm font-medium text-gray-900" id="user-name">
-                    Admin
+                <div class="px-4 py-3 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-purple-50">
+                  <p class="text-sm font-semibold text-gray-900">
+                    {props.name || "User"}
                   </p>
-                  <p class="text-xs text-gray-500" id="user-email">
-                    admin@gmail.com
+                  <p class="text-xs text-gray-600 mt-1">
+                    {props.email || "user@example.com"}
                   </p>
                 </div>
-                <a
-                  href="/profile"
-                  class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  Profile
-                </a>
-                <div class="border-t border-gray-100 mt-2 pt-2">
-                  <a
-                    href="#"
-                    class="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+
+                <div class="py-2">
+                  <A
+                    href="/profile"
+                    class="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors rounded-lg mx-2"
                   >
-                    Logout
-                  </a>
+                    <svg
+                      class="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                      ></path>
+                    </svg>
+                    <span>Profil Saya</span>
+                  </A>
+                </div>
+
+                <div class="border-t border-gray-300 py-2">
+                  <button
+                    ref={(el) => (logoutButton = el)}
+                    class="w-[92%] flex items-center gap-3 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors rounded-lg mx-2 cursor-pointer"
+                  >
+                    <svg
+                      class="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                      ></path>
+                    </svg>
+                    <span>Keluar</span>
+                  </button>
                 </div>
               </div>
             </div>

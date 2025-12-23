@@ -1,6 +1,6 @@
-import { Auth, Meta } from "@contexts";
+import { Auth } from "@contexts";
 import { useNavigate } from "@solidjs/router";
-import { createEffect, onMount, Show } from "solid-js";
+import { onMount } from "solid-js";
 
 interface IAuthLayoutProp {
   title?: string;
@@ -10,15 +10,9 @@ interface IAuthLayoutProp {
 export default function AuthLayout(props: IAuthLayoutProp) {
   const navigate = useNavigate();
   const { isLogged, checked } = Auth.useAuth();
-  const { changeTitle } = Meta.useMeta();
 
   onMount(() => {
     if (checked() && isLogged()) navigate("/", { replace: true });
-  });
-
-  createEffect(() => {
-    if (props.title) changeTitle(props.title);
-    else changeTitle();
   });
 
   return checked() && !isLogged() ? (

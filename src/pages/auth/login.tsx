@@ -1,8 +1,7 @@
-import { AuthLayout } from "@layouts";
-import { Component, createSignal, For, Show } from "solid-js";
+import { Component, createEffect, createSignal, For, Show } from "solid-js";
 import { api } from "@services";
 import { useNavigate } from "@solidjs/router";
-import { Auth } from "@contexts";
+import { Auth, Meta } from "@contexts";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
 import { println } from "@utils";
 
@@ -14,6 +13,7 @@ interface IErrorsBody {
 const Login: Component = () => {
   const navigate = useNavigate();
   const { updateData } = Auth.useAuth();
+  const { changeTitle } = Meta.useMeta();
   const [loading, setLoading] = createSignal<boolean>(false);
   const [errors, setErrors] = createSignal<IErrorsBody>({});
 
@@ -78,7 +78,7 @@ const Login: Component = () => {
       })
       .then((response) => {
         const { success, data, message } = response.data;
-        if (!success) throw new Error("Login failed");
+        if (!success) throw new Error("Login gagal");
 
         const { user, access_token } = data;
         updateData(EAuthUpdateCategory.IS_LOGGED, true);
@@ -130,8 +130,12 @@ const Login: Component = () => {
     }
   };
 
+  createEffect(() => {
+    changeTitle("Login");
+  });
+
   return (
-    <AuthLayout title="Login">
+    <>
       <div class="max-w-md w-full space-y-8">
         <div class="text-center">
           <div class="mx-auto w-20 h-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
@@ -254,7 +258,7 @@ const Login: Component = () => {
           </div>
         </div>
       </div>
-    </AuthLayout>
+    </>
   );
 };
 

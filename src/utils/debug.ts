@@ -1,12 +1,12 @@
-import { APP_ENV } from "@consts";
 import { EDebugType } from "@enums";
+import { DEV } from "solid-js";
 
 const println = (
   title: string,
   message: string,
   type: EDebugType = EDebugType.OTHER
 ) => {
-  const isDevMode = APP_ENV === "development";
+  const isDevMode = DEV;
   const content = `[${title}] ${message}`;
 
   switch (type) {

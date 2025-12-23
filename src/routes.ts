@@ -1,17 +1,25 @@
-import { lazy } from 'solid-js';
-import type { RouteDefinition } from '@solidjs/router';
+import { lazy } from "solid-js";
+import type { RouteDefinition } from "@solidjs/router";
 
-export const routes: RouteDefinition[] = [
+export const protectedRoutes: RouteDefinition[] = [
   {
-    path: '/',
-    component: lazy(() => import('@pages/dashboard/home')),
+    path: "/",
+    component: lazy(() => import("@pages/dashboard/home")),
   },
   {
-    path: '/login',
-    component: lazy(() => import('@pages/auth/login')),
+    path: "/usaha/:role/:slug",
+    component: lazy(() => import("@pages/dashboard/business")),
   },
-  {
-    path: '/*all',
-    component: lazy(() => import('@pages/error/notfound'))
-  }
 ];
+
+export const guestRoutes: RouteDefinition[] = [
+  {
+    path: "/login",
+    component: lazy(() => import("@pages/auth/login")),
+  },
+];
+
+export const notfoundRoute: RouteDefinition = {
+  path: "/*all",
+  component: lazy(() => import("@pages/error/notfound")),
+};

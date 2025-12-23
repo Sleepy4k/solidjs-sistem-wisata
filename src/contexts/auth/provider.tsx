@@ -33,13 +33,29 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
     }
   };
 
-  const logoutUser = () => {
-    LocalStorage.removeItem(TOKEN_KEY_PREFIX);
-    LocalStorage.removeItem(EMAIL_KEY_PREFIX);
-    setUser(null);
-    setAuthToken("");
-    setIsLogged(false);
-    navigate("/login", { replace: true });
+  const logoutUser = async () => {
+    await api
+      .post("/logout")
+      .then(async (response) => {
+        const { success, message } = response.data;
+
+        if (!success) {
+          println("Logout failed:", message, EDebugType.WARN);
+        } else {
+          println("Logout successful:", message, EDebugType.SUCCESS);
+        }
+      })
+      .catch((error) => {
+        println("Session check error:", error.message, EDebugType.ERROR);
+      })
+      .finally(() => {
+        LocalStorage.removeItem(TOKEN_KEY_PREFIX);
+        LocalStorage.removeItem(EMAIL_KEY_PREFIX);
+        setUser(null);
+        setAuthToken("");
+        setIsLogged(false);
+        navigate("/login", { replace: true });
+      });
   };
 
   createEffect(() => {
@@ -89,7 +105,8 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
         })
         .catch((error) => {
           println("Session check error:", error.message, EDebugType.ERROR);
-          logoutUser();
+          LocalStorage.removeItem(TOKEN_KEY_PREFIX);
+          LocalStorage.removeItem(EMAIL_KEY_PREFIX);
         })
         .finally(() => {
           setChecked(true);

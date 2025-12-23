@@ -1,11 +1,12 @@
 import Header from "@components/Header";
+import LogoutModal from "@components/LogoutModal";
 import Sidebar from "@components/Sidebar";
-import { Auth, Meta } from "@contexts";
+import { Auth } from "@contexts";
 import { EDebugType } from "@enums";
 import { api } from "@services";
 import { useNavigate } from "@solidjs/router";
 import { println } from "@utils";
-import { createEffect, createSignal, onMount, Show } from "solid-js";
+import { createSignal, onMount } from "solid-js";
 
 interface IDashboardLayoutProp {
   title?: string;
@@ -14,20 +15,16 @@ interface IDashboardLayoutProp {
 
 export default function DashboardLayout(props: IDashboardLayoutProp) {
   const navigate = useNavigate();
-  const { isLogged, checked } = Auth.useAuth();
-  const { changeTitle } = Meta.useMeta();
-  const [sidebarData, setSidebarData] = createSignal<any[]>([]);
+  const { isLogged, checked, user, logoutUser } = Auth.useAuth();
+  const [sidebarData, setSidebarData] = createSignal([]);
 
   onMount(() => {
     if (checked() && !isLogged()) navigate("/login", { replace: true });
   });
 
-  createEffect(() => {
-    if (props.title) changeTitle(props.title);
-    else changeTitle();
-  });
+  onMount(() => {
+    if (checked() && !isLogged()) return;
 
-  createEffect(() => {
     const loadSidebarData = async () => {
       await api
         .get("/dashboard/sidebar")
@@ -48,9 +45,16 @@ export default function DashboardLayout(props: IDashboardLayoutProp) {
 
   return checked() && isLogged() ? (
     <div id="mainContent" class="min-h-screen bg-gray-50">
-      <Sidebar data={sidebarData()} />
+      <Sidebar
+        userPermissions={user()?.permissions}
+        userRole={user()?.role}
+        userName={user()?.name}
+        userEmail={user()?.email}
+        sidebarData={sidebarData()}
+      />
       <div class="lg:ml-64">
-        <Header />
+        <Header name={user()?.name} email={user()?.email} />
+        <LogoutModal logoutHandler={logoutUser} />
         <main class="p-4 sm:p-6 lg:p-8">{props.children}</main>
       </div>
     </div>
