@@ -1,40 +1,119 @@
 import { AuthLayout } from "@layouts";
-import { Component } from "solid-js";
+import { Component, createSignal, For, Show } from "solid-js";
 import { api } from "@services";
-import { A, useNavigate } from "@solidjs/router";
+import { useNavigate } from "@solidjs/router";
 import { Auth } from "@contexts";
+import { EAuthUpdateCategory, EDebugType } from "@enums";
+import { println } from "@utils";
+
+interface IErrorsBody {
+  email?: string[];
+  password?: string[];
+}
 
 const Login: Component = () => {
   const navigate = useNavigate();
   const { updateData } = Auth.useAuth();
+  const [loading, setLoading] = createSignal<boolean>(false);
+  const [errors, setErrors] = createSignal<IErrorsBody>({});
+
+  let emailInput: HTMLInputElement, passwordInput: HTMLInputElement;
+
+  const validateForm = (): boolean => {
+    let isValid = true;
+    const email = emailInput.value;
+    const password = passwordInput.value;
+
+    if (!email || !password) {
+      setErrors({
+        email: !email ? ["Email harus di isi"] : [],
+        password: !password ? ["Password harus di isi"] : [],
+      });
+      println("Login", "Semua input harus di isi", EDebugType.WARN);
+      return false;
+    }
+
+    const isEmailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!isEmailValid) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        email: ["Format email tidak valid"],
+      }));
+      println("Login", "Format email tidak valid", EDebugType.WARN);
+      isValid = false;
+    }
+
+    const isPasswordValid = password.length >= 8;
+    if (!isPasswordValid) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        password: ["Password harus terdiri dari minimal 8 karakter"],
+      }));
+      println(
+        "Login",
+        "Password harus terdiri dari minimal 8 karakter",
+        EDebugType.WARN
+      );
+      isValid = false;
+    }
+
+    return isValid;
+  };
 
   const handleSubmit = (e: Event) => {
     e.preventDefault();
 
+    setErrors({});
+    setLoading(true);
+
+    if (!validateForm()) {
+      setLoading(false);
+      return;
+    }
+
     api
       .post("/login", {
-        email: (document.getElementById("email") as HTMLInputElement).value,
-        password: (document.getElementById("password") as HTMLInputElement)
-          .value,
+        email: emailInput.value,
+        password: passwordInput.value,
       })
       .then((response) => {
-        const { user, token } = response.data;
+        const { success, data, message } = response.data;
+        if (!success) throw new Error("Login failed");
+
+        const { user, access_token } = data;
+        updateData(EAuthUpdateCategory.IS_LOGGED, true);
+        updateData(EAuthUpdateCategory.USER, user);
+        updateData(EAuthUpdateCategory.TOKEN, access_token);
+
+        println("Login", message, EDebugType.SUCCESS);
+        navigate("/", { replace: true });
       })
       .catch((error) => {
-        console.error("Login failed:", error);
-        // Handle login error (e.g., show error message)
+        if (error.response && error.response.status === 422) {
+          const responseData = error.response.data;
+          println(
+            "Login",
+            "Satu atau lebih input tidak valid.",
+            EDebugType.ERROR
+          );
+          setErrors(responseData.errors);
+        } else {
+          println(
+            "Login",
+            "Seperti ada yang tidak beres. Jika masalah berlanjut, silakan hubungi administrator.",
+            EDebugType.ERROR
+          );
+        }
+      })
+      .finally(() => {
+        setLoading(false);
       });
   };
 
   const handleTogglePassword = (e: Event) => {
     e.preventDefault();
-    const passwordInput = document.getElementById(
-      "password"
-    ) as HTMLInputElement;
-    const passwordIcon = document.getElementById(
-      "password-icon"
-    ) as HTMLElement;
 
+    const icon = document.getElementById("passico")!;
     const isTypePassword = passwordInput.type === "password";
 
     passwordInput.type = isTypePassword ? "text" : "password";
@@ -43,11 +122,11 @@ const Login: Component = () => {
       : "••••••••";
 
     if (isTypePassword) {
-      passwordIcon.classList.remove("fa-eye");
-      passwordIcon.classList.add("fa-eye-slash");
+      icon.classList.remove("fa-eye-slash");
+      icon.classList.add("fa-eye");
     } else {
-      passwordIcon.classList.remove("fa-eye-slash");
-      passwordIcon.classList.add("fa-eye");
+      icon.classList.remove("fa-eye");
+      icon.classList.add("fa-eye-slash");
     }
   };
 
@@ -78,14 +157,23 @@ const Login: Component = () => {
                     <i class="fas fa-envelope text-gray-400"></i>
                   </div>
                   <input
-                    id="email"
                     name="email"
                     type="email"
                     required
                     class="login-input"
                     placeholder="admin@gmail.com"
+                    disabled={loading()}
+                    ref={(el) => (emailInput = el)}
+                    autocomplete="email"
                   />
                 </div>
+                <Show when={errors().email}>
+                  <div class="mt-1 text-sm text-red-600">
+                    <For each={errors().email}>
+                      {(error) => <div>{error}</div>}
+                    </For>
+                  </div>
+                </Show>
               </div>
 
               <div class="relative">
@@ -97,36 +185,34 @@ const Login: Component = () => {
                     <i class="fas fa-lock text-gray-400"></i>
                   </div>
                   <input
-                    id="password"
                     name="password"
                     type="password"
                     required
                     class="login-input pr-12"
                     placeholder="••••••••"
+                    disabled={loading()}
+                    ref={(el) => (passwordInput = el)}
+                    autocomplete="current-password"
                   />
                   <button
                     type="button"
-                    id="password-toggle"
                     class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
                     onClick={handleTogglePassword}
+                    disabled={loading()}
                   >
                     <i
-                      id="password-icon"
-                      class="fas fa-eye text-gray-400 hover:text-gray-600 transition-colors"
+                      id="passico"
+                      class="fas fa-eye-slash text-gray-400 hover:text-gray-600 transition-colors"
                     ></i>
                   </button>
                 </div>
-              </div>
-
-              <div class="flex items-center justify-end">
-                <div class="text-sm">
-                  <A
-                    href="/forgot-password"
-                    class="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-                  >
-                    Lupa kata sandi?
-                  </A>
-                </div>
+                <Show when={errors().password}>
+                  <div class="mt-1 text-sm text-red-600">
+                    <For each={errors().password}>
+                      {(error) => <div>{error}</div>}
+                    </For>
+                  </div>
+                </Show>
               </div>
 
               <button
@@ -134,11 +220,24 @@ const Login: Component = () => {
                 id="login-btn"
                 class="group relative w-full btn-primary py-3 text-base shadow-lg hover:shadow-xl transform hover:scale-[1.02] transition-all duration-300 cursor-pointer"
                 onClick={handleSubmit}
+                disabled={loading()}
               >
-                <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                  <i class="fas fa-sign-in-alt text-white opacity-75 group-hover:opacity-100 transition-opacity"></i>
-                </span>
-                Masuk ke Dashboard
+                <Show
+                  when={!loading()}
+                  fallback={
+                    <>
+                      <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                        <i class="fas fa-spinner fa-spin text-white opacity-75"></i>
+                      </span>
+                      Memproses
+                    </>
+                  }
+                >
+                  <span class="absolute left-0 inset-y-0 flex items-center pl-3">
+                    <i class="fas fa-sign-in-alt text-white opacity-75 group-hover:opacity-100 transition-opacity"></i>
+                  </span>
+                  Masuk ke Dashboard
+                </Show>
               </button>
             </div>
           </div>
