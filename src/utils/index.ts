@@ -1,19 +1,27 @@
 import { println } from "./debug";
 import LocalStorage from "./storage";
 import {
-  trimText,
-  convertToTitleCase,
-  convertErrorResponseData,
-  convertStringToNumber,
-  convertNumberToString,
+  firstChar,
+  ucFirst,
+  ucWords,
+  toSlug,
+  pluralize,
+  formatDate,
+  convertToTitle,
+  getObjectLength,
+  formatCurrency,
 } from "./parse";
 
 export {
   println,
   LocalStorage,
-  trimText,
-  convertToTitleCase,
-  convertErrorResponseData,
-  convertStringToNumber,
-  convertNumberToString,
+  firstChar,
+  ucFirst,
+  ucWords,
+  toSlug,
+  pluralize,
+  formatDate,
+  convertToTitle,
+  getObjectLength,
+  formatCurrency,
 };

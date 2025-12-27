@@ -1,15 +1,8 @@
+import DataTable from "@components/DataTable";
 import { Auth, Meta } from "@contexts";
 import { useParams } from "@solidjs/router";
+import { ucFirst, ucWords } from "@utils";
 import { Component, createEffect } from "solid-js";
-
-const ucfirst = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-const ucwords = (str: string) =>
-  str
-    .replace(/-/g, " ")
-    .toLowerCase()
-    .split(" ")
-    .map((word) => ucfirst(word))
-    .join(" ");
 
 const Business: Component = () => {
   const { user } = Auth.useAuth();
@@ -18,8 +11,8 @@ const Business: Component = () => {
 
   createEffect(() => {
     changeTitle(
-      `${ucfirst(params.role)}${
-        params.slug ? ` - ${ucwords(params.slug)}` : ""
+      `${ucFirst(params.role)}${
+        params.slug ? ` - ${ucWords(params.slug)}` : ""
       }`
     );
   });
@@ -35,6 +28,11 @@ const Business: Component = () => {
         {params.role}
         {params.slug ? ` dan slug ${params.slug}` : ""}.
       </p>
+      <DataTable
+        endpoint={`https://be-siswis.burunghantu.id/dashboard/${params.role}${
+          params.slug ? `/${params.slug}` : ""
+        }`}
+      />
     </>
   );
 };

@@ -25,7 +25,7 @@ api.interceptors.response.use(
     const response = error.response;
 
     if (response) {
-      if (response.status === 401) {
+      if (response.status === 401 && window.location.pathname !== "/login") {
         const { success, message } = response.data;
         if (!success) {
           println("Autentikasi gagal", message, EDebugType.ERROR);

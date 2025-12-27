@@ -1,4 +1,4 @@
-import { onMount } from "solid-js";
+import { onCleanup, onMount } from "solid-js";
 
 interface ILogoutModalProp {
   logoutHandler?: () => void;
@@ -10,15 +10,23 @@ export default function LogoutModal(props: ILogoutModalProp) {
     confirmButton: HTMLButtonElement,
     buttonText: HTMLSpanElement;
 
-  onMount(() => {
-    cancelButton.addEventListener("click", () => {
-      modal.classList.add("hidden");
-    });
+  const handleCancelClick = () => {
+    modal.classList.add("hidden");
+  };
 
-    confirmButton.addEventListener("click", () => {
-      buttonText.textContent = "Logging out...";
-      confirmButton.setAttribute("disabled", "true");
-      if (props.logoutHandler) props.logoutHandler();
+  const handleConfirmClick = () => {
+    buttonText.textContent = "Logging out...";
+    confirmButton.setAttribute("disabled", "true");
+    if (props.logoutHandler) props.logoutHandler();
+  };
+
+  onMount(() => {
+    cancelButton.addEventListener("click", handleCancelClick);
+    confirmButton.addEventListener("click", handleConfirmClick);
+
+    onCleanup(() => {
+      cancelButton.removeEventListener("click", handleCancelClick);
+      confirmButton.removeEventListener("click", handleConfirmClick);
     });
   });
 

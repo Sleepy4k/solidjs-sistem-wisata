@@ -10,6 +10,14 @@ export const protectedRoutes: RouteDefinition[] = [
     path: "/usaha/:role/:slug",
     component: lazy(() => import("@pages/dashboard/business")),
   },
+  {
+    path: "/profile",
+    component: lazy(() => import("@pages/dashboard/profile/home")),
+  },
+  {
+    path: "/profile/edit",
+    component: lazy(() => import("@pages/dashboard/profile/edit")),
+  },
 ];
 
 export const guestRoutes: RouteDefinition[] = [

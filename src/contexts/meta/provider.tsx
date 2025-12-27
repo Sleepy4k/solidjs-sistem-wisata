@@ -1,13 +1,13 @@
 import { APP_NAME } from '@consts';
 import MetaContext from './context';
-import { createSignal, JSXElement } from 'solid-js';
+import { createSignal } from 'solid-js';
 
 interface IProviderProp {
   children: any;
 }
 
 const MetaProvider = (props: IProviderProp) => {
-  const [title, setTitle] = createSignal(APP_NAME);
+  const [title, setTitle] = createSignal<string>(APP_NAME);
 
   const changeTitle = (title?: string) => {
     document.title = title ? `${title} | ${APP_NAME}` : APP_NAME;
@@ -15,7 +15,7 @@ const MetaProvider = (props: IProviderProp) => {
   };
 
   return (
-    <MetaContext.Provider value={{ changeTitle }}>
+    <MetaContext.Provider value={{ title, changeTitle }}>
       {props.children}
     </MetaContext.Provider>
   );

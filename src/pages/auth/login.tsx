@@ -4,6 +4,19 @@ import { useNavigate } from "@solidjs/router";
 import { Auth, Meta } from "@contexts";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
 import { println } from "@utils";
+import Fa from "solid-fa";
+import {
+  faEnvelope,
+  faEye,
+  faEyeSlash,
+  faGlobeAsia,
+  faLock,
+  faMapMarkedAlt,
+  faMapPin,
+  faShieldAlt,
+  faSignInAlt,
+  faSpinner,
+} from "@fortawesome/free-solid-svg-icons";
 
 interface IErrorsBody {
   email?: string[];
@@ -16,6 +29,7 @@ const Login: Component = () => {
   const { changeTitle } = Meta.useMeta();
   const [loading, setLoading] = createSignal<boolean>(false);
   const [errors, setErrors] = createSignal<IErrorsBody>({});
+  const [isShowPassword, setIsShowPassword] = createSignal<boolean>(false);
 
   let emailInput: HTMLInputElement, passwordInput: HTMLInputElement;
 
@@ -97,6 +111,14 @@ const Login: Component = () => {
             EDebugType.ERROR
           );
           setErrors(responseData.errors);
+        } else if (error.response && error.response.status === 401) {
+          const responseData = error.response.data;
+          println(
+            "Login",
+            "Email atau kata sandi salah. Silakan coba lagi.",
+            EDebugType.ERROR
+          );
+          setErrors(responseData.errors);
         } else {
           println(
             "Login",
@@ -107,13 +129,13 @@ const Login: Component = () => {
       })
       .finally(() => {
         setLoading(false);
+        passwordInput.value = "";
       });
   };
 
   const handleTogglePassword = (e: Event) => {
     e.preventDefault();
 
-    const icon = document.getElementById("passico")!;
     const isTypePassword = passwordInput.type === "password";
 
     passwordInput.type = isTypePassword ? "text" : "password";
@@ -121,13 +143,7 @@ const Login: Component = () => {
       ? "Masukkan kata sandi"
       : "••••••••";
 
-    if (isTypePassword) {
-      icon.classList.remove("fa-eye-slash");
-      icon.classList.add("fa-eye");
-    } else {
-      icon.classList.remove("fa-eye");
-      icon.classList.add("fa-eye-slash");
-    }
+    setIsShowPassword(!isShowPassword());
   };
 
   createEffect(() => {
@@ -139,7 +155,7 @@ const Login: Component = () => {
       <div class="max-w-md w-full space-y-8">
         <div class="text-center">
           <div class="mx-auto w-20 h-20 bg-gradient-to-r from-blue-600 to-emerald-600 rounded-full flex items-center justify-center shadow-lg">
-            <i class="fas fa-map-marked-alt text-white text-2xl"></i>
+            <Fa icon={faMapMarkedAlt} class="text-white text-2xl" />
           </div>
           <h2 class="mt-6 text-3xl font-bold text-blue-900">
             Admin Pariwisata
@@ -158,7 +174,7 @@ const Login: Component = () => {
                 </label>
                 <div class="relative">
                   <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i class="fas fa-envelope text-gray-400"></i>
+                    <Fa icon={faEnvelope} class="text-gray-400" />
                   </div>
                   <input
                     name="email"
@@ -186,7 +202,7 @@ const Login: Component = () => {
                 </label>
                 <div class="relative">
                   <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i class="fas fa-lock text-gray-400"></i>
+                    <Fa icon={faLock} class="text-gray-400" />
                   </div>
                   <input
                     name="password"
@@ -204,10 +220,10 @@ const Login: Component = () => {
                     onClick={handleTogglePassword}
                     disabled={loading()}
                   >
-                    <i
-                      id="passico"
-                      class="fas fa-eye-slash text-gray-400 hover:text-gray-600 transition-colors"
-                    ></i>
+                    <Fa
+                      icon={isShowPassword() ? faEye : faEyeSlash}
+                      class="text-gray-400 hover:text-gray-600 transition-colors"
+                    />
                   </button>
                 </div>
                 <Show when={errors().password}>
@@ -231,14 +247,20 @@ const Login: Component = () => {
                   fallback={
                     <>
                       <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                        <i class="fas fa-spinner fa-spin text-white opacity-75"></i>
+                        <Fa
+                          icon={faSpinner}
+                          class="fa-spin text-white opacity-75"
+                        />
                       </span>
                       Memproses
                     </>
                   }
                 >
                   <span class="absolute left-0 inset-y-0 flex items-center pl-3">
-                    <i class="fas fa-sign-in-alt text-white opacity-75 group-hover:opacity-100 transition-opacity"></i>
+                    <Fa
+                      icon={faSignInAlt}
+                      class="text-white opacity-75 group-hover:opacity-100 transition-opacity"
+                    />
                   </span>
                   Masuk ke Dashboard
                 </Show>
@@ -252,9 +274,9 @@ const Login: Component = () => {
             Sistem Manajemen Pariwisata <br />
           </p>
           <div class="mt-4 flex justify-center space-x-4 text-gray-400">
-            <i class="fas fa-globe-asia" title="Platform Global"></i>
-            <i class="fas fa-map-pin" title="Lokasi Terpercaya"></i>
-            <i class="fas fa-shield-alt" title="Keamanan Terjamin"></i>
+            <Fa icon={faGlobeAsia} />
+            <Fa icon={faMapPin} />
+            <Fa icon={faShieldAlt} />
           </div>
         </div>
       </div>

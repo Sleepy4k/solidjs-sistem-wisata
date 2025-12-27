@@ -1,5 +1,9 @@
+import { Meta } from "@contexts";
+import { faBars } from "@fortawesome/free-solid-svg-icons";
 import { A } from "@solidjs/router";
-import { createEffect, onMount } from "solid-js";
+import { convertToTitle, firstChar } from "@utils";
+import Fa from "solid-fa";
+import { onCleanup, onMount, Show } from "solid-js";
 
 interface IHeaderProp {
   name?: string;
@@ -7,39 +11,82 @@ interface IHeaderProp {
 }
 
 export default function Header(props: IHeaderProp) {
-  let profileDropdown: HTMLDivElement,
-    profileButton: HTMLButtonElement,
-    logoutButton: HTMLButtonElement;
-  let currentDate: string = new Date().toLocaleDateString("id-ID", {
+  const { title } = Meta.useMeta();
+
+  const currentDate: string = new Date().toLocaleDateString("id-ID", {
     weekday: "long",
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-  createEffect(() => {
-    const interval = setInterval(() => {
-      currentDate = new Date().toLocaleDateString("id-ID", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
-    }, 60000);
+  let profileDropdown: HTMLDivElement,
+    profileButton: HTMLButtonElement,
+    logoutButton: HTMLButtonElement;
 
-    return () => clearInterval(interval);
-  });
+  const handleBurgerClick = () => {
+    const sidebar = document.getElementById("sidebar") as HTMLDivElement;
+    const overlay = document.getElementById(
+      "sidebar-overlay"
+    ) as HTMLDivElement;
+    const nav = document.getElementById("sidebar-nav") as HTMLDivElement;
+
+    if (sidebar && overlay) {
+      const isOpen = !sidebar.classList.contains("-translate-x-full");
+
+      if (isOpen) {
+        if (nav) {
+          sidebar.setAttribute("data-scroll-pos", nav.scrollTop.toString());
+        }
+
+        sidebar.classList.add("-translate-x-full");
+        overlay.classList.add("hidden");
+        document.body.classList.remove("overflow-hidden");
+      } else {
+        sidebar.classList.remove("-translate-x-full");
+        overlay.classList.remove("hidden");
+        document.body.classList.add("overflow-hidden");
+
+        if (nav) {
+          const scrollPos = parseInt(
+            sidebar.getAttribute("data-scroll-pos") || "0"
+          );
+          nav.scrollTop = scrollPos;
+        }
+      }
+    }
+  };
+
+  const handleProfileClick = () => {
+    profileDropdown.classList.toggle("hidden");
+  };
+
+  const handleLogoutClick = () => {
+    const logoutModal = document.getElementById(
+      "logout-modal"
+    ) as HTMLDivElement;
+    logoutModal.classList.remove("hidden");
+  };
+
+  const handleWindowClick = (event: MouseEvent) => {
+    if (
+      !profileDropdown.classList.contains("hidden") &&
+      !profileDropdown.contains(event.target as Node) &&
+      !profileButton.contains(event.target as Node)
+    ) {
+      profileDropdown.classList.add("hidden");
+    }
+  };
 
   onMount(() => {
-    profileButton.addEventListener("click", () => {
-      profileDropdown.classList.toggle("hidden");
-    });
+    profileButton.addEventListener("click", handleProfileClick);
+    logoutButton.addEventListener("click", handleLogoutClick);
+    window.addEventListener("click", handleWindowClick);
 
-    logoutButton.addEventListener("click", () => {
-      const logoutModal = document.getElementById(
-        "logout-modal"
-      ) as HTMLDivElement;
-      logoutModal.classList.remove("hidden");
+    onCleanup(() => {
+      profileButton.removeEventListener("click", handleProfileClick);
+      logoutButton.removeEventListener("click", handleLogoutClick);
+      window.removeEventListener("click", handleWindowClick);
     });
   });
 
@@ -48,21 +95,22 @@ export default function Header(props: IHeaderProp) {
       <div class="bg-white border-b border-gray-200 shadow-sm">
         <div class="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between">
           <div class="flex items-center gap-4">
-            <button class="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors">
-              <svg
-                class="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M4 6h16M4 12h16M4 18h16"
-                ></path>
-              </svg>
+            <button
+              class="lg:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={handleBurgerClick}
+            >
+              <Fa icon={faBars} class="text-gray-600 text-lg" />
             </button>
+            <Show
+              when={title()}
+              fallback={
+                <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+              }
+            >
+              <h1 class="text-lg font-semibold text-gray-900">
+                {convertToTitle(title())}
+              </h1>
+            </Show>
           </div>
 
           <div class="flex items-center gap-3">
@@ -91,7 +139,7 @@ export default function Header(props: IHeaderProp) {
               >
                 <div class="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
                   <span class="text-white text-sm font-medium">
-                    {props.name ? props.name.charAt(0).toUpperCase() : "A"}
+                    {firstChar(props.name || "A", true)}
                   </span>
                 </div>
               </button>

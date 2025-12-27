@@ -1,8 +1,9 @@
-import { Suspense, type Component } from "solid-js";
+import { type Component } from "solid-js";
 import { Auth, Meta } from "@contexts";
 import { Route, Router, RouteSectionProps } from "@solidjs/router";
-import { AuthLayout, DashboardLayout } from "@layouts";
+import { AuthLayout, DashboardLayout, ErrorLayout } from "@layouts";
 import { guestRoutes, notfoundRoute, protectedRoutes } from "./routes";
+import TopLoader from "@components/TopLoader";
 
 const DashboardWrapper = (props: RouteSectionProps) => {
   return <DashboardLayout>{props.children}</DashboardLayout>;
@@ -12,21 +13,22 @@ const AuthWrapper = (props: RouteSectionProps) => {
   return <AuthLayout>{props.children}</AuthLayout>;
 };
 
+const ErrorWrapper = (props: RouteSectionProps) => {
+  return <ErrorLayout title="Not Found">{props.children}</ErrorLayout>;
+};
+
 const App: Component = () => {
   return (
     <Router
       root={(props) => (
-        <Suspense
-          fallback={
-            <div class="flex justify-center items-center h-screen bg-gray-100">
-              <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-            </div>
-          }
-        >
-          <Meta.MetaProvider>
-            <Auth.AuthProvider>{props.children}</Auth.AuthProvider>
-          </Meta.MetaProvider>
-        </Suspense>
+        <Meta.MetaProvider>
+          <Auth.AuthProvider>
+            <>
+              <TopLoader />
+              {props.children}
+            </>
+          </Auth.AuthProvider>
+        </Meta.MetaProvider>
       )}
     >
       <Route component={DashboardWrapper}>
@@ -39,7 +41,9 @@ const App: Component = () => {
           <Route path={route.path} component={route.component} />
         ))}
       </Route>
-      <Route path={notfoundRoute.path} component={notfoundRoute.component} />
+      <Route component={ErrorWrapper}>
+        <Route path={notfoundRoute.path} component={notfoundRoute.component} />
+      </Route>
     </Router>
   );
 };

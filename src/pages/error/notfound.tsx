@@ -1,10 +1,9 @@
-import { ErrorLayout } from "@layouts";
 import { A } from "@solidjs/router";
 import { Component } from "solid-js";
 
 const NotFound: Component = () => {
   return (
-    <ErrorLayout title="Not Found">
+    <>
       <h1 class="text-6xl font-bold text-gray-800 mb-4">404</h1>
       <p class="text-2xl font-semibold text-gray-600 mb-4">Page Not Found</p>
       <p class="text-gray-500 mb-8">
@@ -16,7 +15,7 @@ const NotFound: Component = () => {
       >
         Go Home
       </A>
-    </ErrorLayout>
+    </>
   );
 };
 

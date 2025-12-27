@@ -1,5 +1,15 @@
+import {
+  faBuilding,
+  faChartLine,
+  faPlusCircle,
+  faShop,
+  faStore,
+} from "@fortawesome/free-solid-svg-icons";
+import { getSidebarItems } from "@services";
 import { A } from "@solidjs/router";
-import { For, Show } from "solid-js";
+import { firstChar, toSlug } from "@utils";
+import Fa from "solid-fa";
+import { createResource, For, onCleanup, onMount, Show } from "solid-js";
 
 interface IMenuItem {
   id?: number;
@@ -21,19 +31,23 @@ interface ISidebarProp {
   userPermissions?: string[];
   userName?: string;
   userEmail?: string;
-  sidebarData: IMenuItem[];
+  isLoading?: boolean;
 }
 
-export default function Sidebar(props: ISidebarProp) {
-  const hasPermission = (sidebar: IMenuItem): boolean => {
-    if (!sidebar.meta?.permissions || !sidebar.roles) {
-      return true;
-    }
+const generateIcon = (index: number) => {
+  const icons = [faStore, faBuilding, faShop];
+  return icons[index % icons.length];
+};
 
-    if (sidebar.roles && sidebar.roles.length > 0) {
-      if (!props.userRole || !sidebar.roles.includes(props.userRole)) {
-        return false;
-      }
+export default function Sidebar(props: ISidebarProp) {
+  const [sidebarData, _] = createResource(
+    () => props.isLoading,
+    getSidebarItems
+  );
+
+  const hasPermission = (sidebar: IMenuItem): boolean => {
+    if (!sidebar.meta?.permissions) {
+      return true;
     }
 
     if (sidebar.meta?.permissions && sidebar.meta.permissions.length > 0) {
@@ -52,9 +66,35 @@ export default function Sidebar(props: ISidebarProp) {
   const getMenuRole = (sidebar: IMenuItem): string => {
     return (
       sidebar.meta?.route?.split("/")[4] ||
-      sidebar.name.toLowerCase().replace(/\s+/g, "-")
+      toSlug(sidebar.name)
     );
   };
+
+  const handleOverlayClick = (overlay: HTMLDivElement) => {
+    const sidebar = document.getElementById("sidebar") as HTMLDivElement;
+
+    if (sidebar) {
+      sidebar.classList.add("-translate-x-full");
+      overlay.classList.add("hidden");
+      document.body.classList.remove("overflow-hidden");
+    }
+  };
+
+  onMount(() => {
+    const overlay = document.getElementById(
+      "sidebar-overlay"
+    ) as HTMLDivElement;
+
+    if (overlay) {
+      overlay.addEventListener("click", () => handleOverlayClick(overlay));
+    }
+
+    onCleanup(() => {
+      if (overlay) {
+        overlay.removeEventListener("click", () => handleOverlayClick(overlay));
+      }
+    });
+  });
 
   return (
     <>
@@ -96,54 +136,75 @@ export default function Sidebar(props: ISidebarProp) {
             <A
               href="/"
               class="flex items-center gap-3 px-4 py-3 rounded-xl text-blue-700 hover:bg-blue-100 transition-all duration-200 group cursor-pointer"
-              inactiveClass=""
-              activeClass="bg-blue-600 text-white shadow-lg"
+              inactiveClass="text-gray-700 hover:bg-gray-100 hover:text-blue-700"
+              activeClass="bg-blue-600 text-white shadow-lg hover:text-blue-700"
               end
             >
-              <i class="fas fa-chart-line w-5 h-5"></i>
+              <Fa icon={faChartLine} class="w-5 h-5" />
               <span>Dashboard</span>
             </A>
 
             <Show
-              when={props.sidebarData.length > 0}
+              when={sidebarData()}
               fallback={
-                <div class="flex items-center justify-center py-8">
-                  <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
+                <>
+                  <div class="my-4">
+                    <div class="border-t border-gray-300"></div>
+                    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 mt-2">
+                      <div class="w-24 h-4 bg-gray-200 animate-pulse rounded-md"></div>
+                    </h3>
+                  </div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="my-4">
+                    <div class="border-t border-gray-300"></div>
+                    <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 mt-2">
+                      <div class="w-24 h-4 bg-gray-200 animate-pulse rounded-md"></div>
+                    </h3>
+                  </div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                  <div class="px-4 py-3 rounded-xl bg-gray-200 animate-pulse h-10"></div>
+                </>
               }
             >
-              <For each={props.sidebarData}>
-                {(item) => (
+              <For each={sidebarData()}>
+                {(item, index) => (
                   <Show
                     when={!item.is_spacer}
                     fallback={
-                      <div class="my-4">
-                        <div class="border-t border-gray-300"></div>
-                        <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 mt-2">
-                          {item.name}
-                        </h3>
-                      </div>
+                      <Show when={hasPermission(item)}>
+                        <div class="my-4">
+                          <div class="border-t border-gray-300"></div>
+                          <h3 class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-4 py-3 mt-2">
+                            {item.name}
+                          </h3>
+                        </div>
+                      </Show>
                     }
                   >
                     <Show when={hasPermission(item)}>
                       <A
                         href={`${
                           item.is_datatable
-                            ? `/usaha/${getMenuRole(item)}/${item.name
-                                .toLowerCase()
-                                .replace(/\s+/g, "-")}`
+                            ? `/usaha/${getMenuRole(item)}/${toSlug(item.name)}`
                             : `/tambah-usaha/${getMenuRole(item)}`
                         }`}
                         class="flex items-center gap-3 px-4 py-3 rounded-xl text-blue-700 hover:bg-blue-100 transition-all duration-200 group cursor-pointer"
-                        inactiveClass="text-gray-700 hover:bg-gray-100"
-                        activeClass="bg-blue-600 text-white shadow-lg"
+                        inactiveClass="text-gray-700 hover:bg-gray-100 hover:text-blue-700"
+                        activeClass="bg-blue-600 text-white shadow-lg hover:text-blue-700"
                         title={item.name}
                       >
-                        <i
-                          class={`fas fa-${
-                            item.meta?.icon || "folder"
-                          } w-5 h-5`}
-                        ></i>
+                        <Show
+                          when={item.is_datatable}
+                          fallback={<Fa icon={faPlusCircle} class="w-5 h-5" />}
+                        >
+                          <Fa icon={generateIcon(index())} class="w-5 h-5" />
+                        </Show>
                         <span>{item.name}</span>
                       </A>
                     </Show>
@@ -151,17 +212,6 @@ export default function Sidebar(props: ISidebarProp) {
                 )}
               </For>
             </Show>
-
-            <div id="sidebar-error" class="hidden p-4 text-center">
-              <div class="text-red-500 mb-2">
-                <i class="fas fa-exclamation-triangle text-2xl mb-2"></i>
-                <p class="text-sm">Gagal memuat menu</p>
-                <button class="mt-2 px-3 py-1 text-xs bg-red-100 text-red-600 rounded-md hover:bg-red-200">
-                  <i class="fas fa-redo-alt mr-1"></i>
-                  Coba Lagi
-                </button>
-              </div>
-            </div>
           </div>
         </nav>
 
@@ -172,7 +222,7 @@ export default function Sidebar(props: ISidebarProp) {
               id="user-avatar"
             >
               <span class="text-white text-sm font-medium">
-                {props.userName ? props.userName.charAt(0).toUpperCase() : "A"}
+                {firstChar(props.userName || "A", true)}
               </span>
             </div>
             <div class="flex-1">
@@ -191,7 +241,7 @@ export default function Sidebar(props: ISidebarProp) {
       </aside>
 
       <div
-        class="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden hidden transition-opacity duration-300"
+        class="fixed inset-0 bg-transparent z-30 lg:hidden hidden transition-opacity duration-300 backdrop-blur-sm"
         id="sidebar-overlay"
       ></div>
     </>
