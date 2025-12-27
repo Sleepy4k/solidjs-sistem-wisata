@@ -12,6 +12,8 @@
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.13",
+    "@types/node": "^25.0.3",
+    "@types/nprogress": "^0.2.3",
     "path": "^0.12.7",
     "solid-devtools": "^0.34.3",
     "tailwindcss": "^4.1.13",
@@ -21,9 +23,12 @@
     "vite-plugin-solid": "^2.11.8"
   },
   "dependencies": {
-    "@fortawesome/fontawesome-free": "^7.1.0",
+    "@fortawesome/free-solid-svg-icons": "^7.1.0",
     "@solidjs/router": "^0.15.4",
+    "@tanstack/solid-table": "^8.21.3",
     "axios": "^1.13.2",
+    "nprogress": "^0.2.0",
+    "solid-fa": "^0.2.0",
     "solid-js": "^1.9.9"
   }
 }
