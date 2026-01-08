@@ -31,18 +31,18 @@ const App: Component = () => {
         </Meta.MetaProvider>
       )}
     >
-      <Route component={DashboardWrapper}>
-        {protectedRoutes.map((route) => (
-          <Route path={route.path} component={route.component} />
-        ))}
+      <Route component={ErrorWrapper}>
+        <Route path={notfoundRoute.path} component={notfoundRoute.component} />
       </Route>
       <Route component={AuthWrapper}>
         {guestRoutes.map((route) => (
           <Route path={route.path} component={route.component} />
         ))}
       </Route>
-      <Route component={ErrorWrapper}>
-        <Route path={notfoundRoute.path} component={notfoundRoute.component} />
+      <Route component={DashboardWrapper}>
+        {protectedRoutes.map((route) => (
+          <Route path={route.path} component={route.component} />
+        ))}
       </Route>
     </Router>
   );

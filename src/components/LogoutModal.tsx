@@ -53,8 +53,7 @@ export default function LogoutModal(props: ILogoutModalProp) {
             Batal
           </button>
           <button
-            id="logoutConfirmBtn"
-            class="px-4 py-2 rounded-lg text-white bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 transition disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
+            class="px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
             ref={(el) => (confirmButton = el)}
           >
             <span ref={(el) => (buttonText = el)} class="logout-text">

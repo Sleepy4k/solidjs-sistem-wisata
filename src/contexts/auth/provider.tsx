@@ -40,13 +40,13 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
         const { success, message } = response.data;
 
         if (!success) {
-          println("Logout failed:", message, EDebugType.WARN);
+          println("Logout Gagal", message, EDebugType.WARN);
         } else {
-          println("Logout successful:", message, EDebugType.SUCCESS);
+          println("Logout Berhasil", message, EDebugType.SUCCESS);
         }
       })
       .catch((error) => {
-        println("Session check error:", error.message, EDebugType.ERROR);
+        println("Pengecekan Sesi Error", error.message, EDebugType.ERROR);
       })
       .finally(() => {
         LocalStorage.removeItem(TOKEN_KEY_PREFIX);
@@ -81,17 +81,25 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
           const { active, reason, valid_until } = response.data;
 
           if (!active) {
-            throw new Error(reason || "Inactive session");
+            throw new Error(reason || "Sesi tidak aktif");
           }
 
           if (valid_until < 60) {
-            throw new Error("Expired session");
+            throw new Error("Sesi kedaluwarsa");
           }
 
           await api
             .get("/dashboard/profile")
             .then((res) => {
               const userData = res.data.data;
+              if (!userData) {
+                throw new Error("Gagal mengambil data pengguna");
+              }
+
+              if (userData.email !== email) {
+                throw new Error("Email tidak cocok");
+              }
+
               setUser(userData);
               setIsLogged(true);
 
@@ -100,11 +108,11 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
               navigate(oldPath, { replace: true, state: oldState });
             })
             .catch(() => {
-              throw new Error("Failed to fetch user data");
+              throw new Error("Gagal mengambil data pengguna");
             });
         })
         .catch((error) => {
-          println("Session check error:", error.message, EDebugType.ERROR);
+          println("Pengecekan Sesi Error", error.message, EDebugType.ERROR);
           LocalStorage.removeItem(TOKEN_KEY_PREFIX);
           LocalStorage.removeItem(EMAIL_KEY_PREFIX);
         })

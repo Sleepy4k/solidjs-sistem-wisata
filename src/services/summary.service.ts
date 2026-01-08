@@ -26,12 +26,12 @@ const getSummaryData = async (isCanLoad: boolean): Promise<SummaryData | undefin
   try {
     const response = await api.get("/dashboard/statistics");
     if (response.status !== 200) {
-      throw new Error("Failed to fetch summary data");
+      throw new Error("Gagal mengambil data summary");
     }
 
     return response.data.data;
   } catch (error) {
-    println("Summary", "Failed to fetch summary data", EDebugType.ERROR);
+    println("Summary", "Gagal mengambil data summary", EDebugType.ERROR);
   }
 };
 

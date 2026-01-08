@@ -2,8 +2,13 @@ import { Auth, Meta } from "@contexts";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
 import {
   faArrowLeft,
+  faCheckCircle,
   faEye,
   faEyeSlash,
+  faHistory,
+  faLock,
+  faSave,
+  faShieldAlt,
 } from "@fortawesome/free-solid-svg-icons";
 import { api } from "@services";
 import { A } from "@solidjs/router";
@@ -203,7 +208,8 @@ const EditProfile: Component = () => {
       return;
     }
 
-    submitProfileButton.textContent = "Menyimpan...";
+    const oldContent = submitProfileButton.innerHTML;
+    submitProfileButton.innerHTML = "Menyimpan...";
 
     try {
       await api.post("/dashboard/profile", {
@@ -227,7 +233,7 @@ const EditProfile: Component = () => {
       println("Edit Profile", "Gagal memperbarui profil.", EDebugType.ERROR);
     } finally {
       setLoading(false);
-      submitProfileButton.textContent = "Simpan Perubahan";
+      submitProfileButton.innerHTML = oldContent;
     }
   };
 
@@ -242,6 +248,7 @@ const EditProfile: Component = () => {
       return;
     }
 
+    const oldContent = submitProfileButton.innerHTML;
     submitPasswordButton.textContent = "Menyimpan...";
 
     try {
@@ -269,7 +276,7 @@ const EditProfile: Component = () => {
       currentPasswordInput.value = "";
       newPasswordInput.value = "";
       confirmPasswordInput.value = "";
-      submitPasswordButton.textContent = "Ubah Kata Sandi";
+      submitPasswordButton.innerHTML = oldContent;
     }
   };
 
@@ -326,7 +333,7 @@ const EditProfile: Component = () => {
       </div>
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2">
-          <h1 class="text-2xl font-semibold mb-4">Ubah Profil</h1>
+          <h1 class="text-2xl font-semibold mb-4 ms-2">Ubah Profil</h1>
           <form class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
             <div class="mb-4">
               <label for="name" class="block text-gray-700 font-medium mb-2">
@@ -368,125 +375,172 @@ const EditProfile: Component = () => {
                 </div>
               </Show>
             </div>
-            <button
-              type="submit"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
-              ref={(el) => (submitProfileButton = el)}
-              disabled={loading()}
-            >
-              Simpan Perubahan
-            </button>
-          </form>
-        </div>
-        <div>
-          <h1 class="text-2xl font-semibold mb-4">Ubah Kata Sandi</h1>
-          <form class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
-            <div class="mb-4 relative">
-              <label
-                for="current-password"
-                class="block text-gray-700 font-medium mb-2"
+            <div class="flex justify-end">
+              <button
+                type="submit"
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
+                ref={(el) => (submitProfileButton = el)}
+                disabled={loading()}
               >
-                Kata Sandi Saat Ini
-              </label>
-              <div class="relative">
-                <input
-                  type="password"
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
-                  placeholder="••••••••"
-                  ref={(el) => (currentPasswordInput = el)}
-                  required
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
-                  onClick={handleTogglePassword}
-                  disabled={loading()}
-                >
-                  <Fa
-                    icon={passwordState.currentPassword ? faEyeSlash : faEye}
-                    class="text-gray-400 hover:text-gray-600 transition-colors"
-                  />
-                </button>
-              </div>
-              <Show when={errors().current_password}>
-                <div class="mt-1 text-sm text-red-600">
-                  <For each={errors().current_password}>
-                    {(error) => <div>{error}</div>}
-                  </For>
+                <div class="flex items-center gap-2">
+                  <Fa icon={faSave} />
+                  <span>Ubah Profil</span>
                 </div>
-              </Show>
+              </button>
             </div>
-            <div class="mb-4 relative">
-              <label class="block text-gray-700 font-medium mb-2">
-                Kata Sandi Baru
-              </label>
-              <div class="relative">
-                <input
-                  type="password"
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="••••••••"
-                  ref={(el) => (newPasswordInput = el)}
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
-                  onClick={handleTogglePassword}
-                  disabled={loading()}
-                >
-                  <Fa
-                    icon={passwordState.newPassword ? faEyeSlash : faEye}
-                    class="text-gray-400 hover:text-gray-600 transition-colors"
-                  />
-                </button>
-              </div>
-              <Show when={errors().new_password}>
-                <div class="mt-1 text-sm text-red-600">
-                  <For each={errors().new_password}>
-                    {(error) => <div>{error}</div>}
-                  </For>
-                </div>
-              </Show>
-            </div>
-            <div class="mb-4 relative">
-              <label class="block text-gray-700 font-medium mb-2">
-                Konfirmasi Kata Sandi Baru
-              </label>
-              <div class="relative">
-                <input
-                  type="password"
-                  class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="••••••••"
-                  ref={(el) => (confirmPasswordInput = el)}
-                />
-                <button
-                  type="button"
-                  class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
-                  onClick={handleTogglePassword}
-                  disabled={loading()}
-                >
-                  <Fa
-                    icon={passwordState.confirmPassword ? faEyeSlash : faEye}
-                    class="text-gray-400 hover:text-gray-600 transition-colors"
-                  />
-                </button>
-              </div>
-              <Show when={errors().confirm_password}>
-                <div class="mt-1 text-sm text-red-600">
-                  <For each={errors().confirm_password}>
-                    {(error) => <div>{error}</div>}
-                  </For>
-                </div>
-              </Show>
-            </div>
-            <button
-              type="submit"
-              class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
-              ref={(el) => (submitPasswordButton = el)}
-              disabled={loading()}
-            >
-              Ubah Kata Sandi
-            </button>
           </form>
+          <div class="mt-8">
+            <h1 class="text-2xl font-semibold mb-4 ms-2">Ubah Kata Sandi</h1>
+            <form class="bg-white p-6 rounded-lg shadow-md border border-gray-200">
+              <div class="mb-4 relative">
+                <label
+                  for="current-password"
+                  class="block text-gray-700 font-medium mb-2"
+                >
+                  Kata Sandi Saat Ini
+                </label>
+                <div class="relative">
+                  <input
+                    type="password"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12"
+                    placeholder="••••••••"
+                    ref={(el) => (currentPasswordInput = el)}
+                    required
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                    onClick={handleTogglePassword}
+                    disabled={loading()}
+                  >
+                    <Fa
+                      icon={passwordState.currentPassword ? faEyeSlash : faEye}
+                      class="text-gray-400 hover:text-gray-600 transition-colors"
+                    />
+                  </button>
+                </div>
+                <Show when={errors().current_password}>
+                  <div class="mt-1 text-sm text-red-600">
+                    <For each={errors().current_password}>
+                      {(error) => <div>{error}</div>}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+              <div class="mb-4 relative">
+                <label class="block text-gray-700 font-medium mb-2">
+                  Kata Sandi Baru
+                </label>
+                <div class="relative">
+                  <input
+                    type="password"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="••••••••"
+                    ref={(el) => (newPasswordInput = el)}
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                    onClick={handleTogglePassword}
+                    disabled={loading()}
+                  >
+                    <Fa
+                      icon={passwordState.newPassword ? faEyeSlash : faEye}
+                      class="text-gray-400 hover:text-gray-600 transition-colors"
+                    />
+                  </button>
+                </div>
+                <Show when={errors().new_password}>
+                  <div class="mt-1 text-sm text-red-600">
+                    <For each={errors().new_password}>
+                      {(error) => <div>{error}</div>}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+              <div class="mb-4 relative">
+                <label class="block text-gray-700 font-medium mb-2">
+                  Konfirmasi Kata Sandi Baru
+                </label>
+                <div class="relative">
+                  <input
+                    type="password"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="••••••••"
+                    ref={(el) => (confirmPasswordInput = el)}
+                  />
+                  <button
+                    type="button"
+                    class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer"
+                    onClick={handleTogglePassword}
+                    disabled={loading()}
+                  >
+                    <Fa
+                      icon={passwordState.confirmPassword ? faEyeSlash : faEye}
+                      class="text-gray-400 hover:text-gray-600 transition-colors"
+                    />
+                  </button>
+                </div>
+                <Show when={errors().confirm_password}>
+                  <div class="mt-1 text-sm text-red-600">
+                    <For each={errors().confirm_password}>
+                      {(error) => <div>{error}</div>}
+                    </For>
+                  </div>
+                </Show>
+              </div>
+              <div class="flex justify-end">
+                <button
+                  type="submit"
+                  class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition cursor-pointer"
+                  ref={(el) => (submitPasswordButton = el)}
+                  disabled={loading()}
+                >
+                  <div class="flex items-center gap-2">
+                    <Fa icon={faSave} />
+                    <span>Ubah Sandi</span>
+                  </div>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 h-fit lg:mt-12 mt-0">
+          <h3 class="text-lg font-semibold mb-4">Panduan Pengisian Profil</h3>
+          <ul class="list-disc list-inside text-gray-700 space-y-2">
+            <div class="flex items-center gap-2">
+              <Fa icon={faCheckCircle} class="text-blue-500" />
+              <span>Isi semua kolom dengan benar.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <Fa icon={faCheckCircle} class="text-blue-500" />
+              <span>Pastikan nama yang dimasukkan sesuai.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <Fa icon={faCheckCircle} class="text-blue-500" />
+              <span>
+                Pastikan email yang dimasukkan aktif dan dapat dihubungi.
+              </span>
+            </div>
+          </ul>
+          <hr class="my-6" />
+          <h3 class="text-lg font-semibold mb-4">
+            Panduan Pengisian Kata Sandi
+          </h3>
+          <ul class="list-disc list-inside text-gray-700 space-y-2">
+            <div class="flex items-center gap-2">
+              <Fa icon={faLock} class="text-blue-500 me-2" />
+              <span>Gunakan kata sandi yang kuat dan unik.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <Fa icon={faHistory} class="text-blue-500 me-1" />
+              <span>Hindari penggunaan kata sandi yang mudah ditebak.</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <Fa icon={faShieldAlt} class="text-blue-500 me-2" />
+              <span>Selalu konfirmasi kata sandi baru dengan benar.</span>
+            </div>
+          </ul>
         </div>
       </div>
     </>

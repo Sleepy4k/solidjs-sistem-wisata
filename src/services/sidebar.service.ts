@@ -8,12 +8,12 @@ const getSidebarItems = async (isCanLoad: boolean) => {
   try {
     const response = await api.get("/dashboard/sidebar");
     if (response.status !== 200) {
-      throw new Error("Failed to fetch sidebar items");
+      throw new Error("Gagal mengambil data sidebar items");
     }
     
     return response.data.data;
   } catch (error) {
-    println("Sidebar", "Failed to fetch sidebar items", EDebugType.ERROR);
+    println("Sidebar", "Gagal mengambil data sidebar items", EDebugType.ERROR);
   }
 };
 

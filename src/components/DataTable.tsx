@@ -1,4 +1,4 @@
-import { createSignal, createEffect, Show, For, on } from "solid-js";
+import { createSignal, createEffect, Show, For, on, Resource } from "solid-js";
 import {
   createSolidTable,
   getCoreRowModel,
@@ -9,18 +9,6 @@ import {
   OnChangeFn,
 } from "@tanstack/solid-table";
 import { api } from "@services";
-
-type ColumnApiResponse = {
-  status: boolean;
-  message: string;
-  data: {
-    data: string;
-    name: string;
-    title: string;
-    sortable?: boolean;
-    searchable?: boolean;
-  }[];
-};
 
 type BackendColumn = {
   data: string;
@@ -37,17 +25,25 @@ type DataTableApiResponse<T = any> = {
   recordsFiltered: number;
 };
 
+interface ActionProp {
+  enableEdit?: boolean;
+  enableDelete?: boolean;
+  onEdit?: (row: any) => void;
+  onDelete?: (row: any) => void;
+}
+
 interface DataTableProps {
   endpoint: string;
-  columnsEndpoint?: string;
+  columns: Resource<any[]>;
+  action: ActionProp;
 }
 
 export default function DataTable(props: DataTableProps) {
   const [draw, setDraw] = createSignal<number>(0);
   const [data, setData] = createSignal<any[]>([]);
   const [columns, setColumns] = createSignal<ColumnDef<any>[]>([]);
-  const [isConfigLoading, setIsConfigLoading] = createSignal(true);
-  const [isDataLoading, setIsDataLoading] = createSignal(false);
+  const [isConfigLoading, setIsConfigLoading] = createSignal<boolean>(true);
+  const [isDataLoading, setIsDataLoading] = createSignal<boolean>(false);
   const [error, setError] = createSignal<string>("");
 
   const [pagination, setPagination] = createSignal<PaginationState>({
@@ -55,24 +51,20 @@ export default function DataTable(props: DataTableProps) {
     pageSize: 10,
   });
   const [sorting, setSorting] = createSignal<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = createSignal("");
-  const [debouncedGlobalFilter, setDebouncedGlobalFilter] = createSignal("");
-  const [pageCount, setPageCount] = createSignal(0);
-  const [recordsTotal, setRecordsTotal] = createSignal(0);
-  const [recordsFiltered, setRecordsFiltered] = createSignal(0);
+  const [globalFilter, setGlobalFilter] = createSignal<string>("");
+  const [debouncedGlobalFilter, setDebouncedGlobalFilter] =
+    createSignal<string>("");
+  const [pageCount, setPageCount] = createSignal<number>(0);
+  const [recordsTotal, setRecordsTotal] = createSignal<number>(0);
+  const [recordsFiltered, setRecordsFiltered] = createSignal<number>(0);
 
   let searchDebounceTimer: number | undefined;
+  let searchInputRef: HTMLInputElement | undefined;
+  let pageSizeSelectRef: HTMLSelectElement | undefined;
 
   const fetchConfig = async () => {
-    const url = props.columnsEndpoint || `${props.endpoint}/columns`;
-
     try {
-      const response = await api.get<ColumnApiResponse>(url);
-
-      if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
-
-      const json = response.data;
-      const colsData = json.data || json;
+      const colsData = props.columns() || [];
 
       setColumns(
         colsData.map((col: BackendColumn) => ({
@@ -81,6 +73,49 @@ export default function DataTable(props: DataTableProps) {
           enableSorting: col.sortable !== false,
         }))
       );
+
+      if (
+        !colsData.find((col: BackendColumn) => col.data === "actions") &&
+        (props.action.enableEdit || props.action.enableDelete)
+      ) {
+        setColumns((cols) => [
+          ...cols,
+          {
+            accessorKey: "actions",
+            header: "Actions",
+
+            enableSorting: false,
+            cell: ({ row }) => {
+              return (
+                <div class="flex items-center gap-2">
+                  <Show when={props.action.enableEdit}>
+                    <button
+                      class="px-2 py-1 text-sm text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors cursor-pointer"
+                      onClick={() =>
+                        props.action.onEdit && props.action.onEdit(row.original)
+                      }
+                    >
+                      Edit
+                    </button>
+                  </Show>
+                  <Show when={props.action.enableDelete}>
+                    <button
+                      class="px-2 py-1 text-sm text-white bg-red-600 rounded-md hover:bg-red-700 transition-colors cursor-pointer"
+                      onClick={() =>
+                        props.action.onDelete &&
+                        props.action.onDelete(row.original)
+                      }
+                    >
+                      Delete
+                    </button>
+                  </Show>
+                </div>
+              );
+            },
+          },
+        ]);
+      }
+
       setError("");
     } catch (err) {
       setError("Failed to load table configuration");
@@ -91,7 +126,7 @@ export default function DataTable(props: DataTableProps) {
   };
 
   const fetchData = async () => {
-    if (isConfigLoading()) return;
+    if (isConfigLoading() || props.columns.loading) return;
 
     setIsDataLoading(true);
     setError("");
@@ -160,7 +195,8 @@ export default function DataTable(props: DataTableProps) {
     }
   };
 
-  const handleSearchInput = (value: string) => {
+  const handleSearchInput = (e: InputEvent) => {
+    const value = (e.currentTarget as HTMLInputElement).value;
     setGlobalFilter(value);
 
     if (searchDebounceTimer) {
@@ -168,9 +204,18 @@ export default function DataTable(props: DataTableProps) {
     }
 
     searchDebounceTimer = setTimeout(() => {
-      setDebouncedGlobalFilter(value);
-      setPagination((p) => ({ ...p, pageIndex: 0 }));
+      if (debouncedGlobalFilter() !== value) {
+        setDebouncedGlobalFilter(value);
+        if (pagination().pageIndex !== 0) {
+          setPagination((p) => ({ ...p, pageIndex: 0 }));
+        }
+      }
     }, 300) as unknown as number;
+  };
+
+  const handlePageSizeChange = (e: Event) => {
+    const size = Number((e.currentTarget as HTMLSelectElement).value);
+    table.setPageSize(size);
   };
 
   const getPageNumbers = () => {
@@ -208,7 +253,7 @@ export default function DataTable(props: DataTableProps) {
 
   createEffect(
     on(
-      () => props.endpoint,
+      () => !props.columns.loading,
       () => {
         if (searchDebounceTimer) {
           clearTimeout(searchDebounceTimer);
@@ -224,6 +269,9 @@ export default function DataTable(props: DataTableProps) {
         setPageCount(0);
         setRecordsTotal(0);
         setRecordsFiltered(0);
+
+        if (searchInputRef) searchInputRef.value = "";
+
         fetchConfig();
       }
     )
@@ -274,7 +322,7 @@ export default function DataTable(props: DataTableProps) {
       </Show>
 
       <Show
-        when={!isConfigLoading()}
+        when={!isConfigLoading() && !props.columns.loading}
         fallback={
           <div class="h-96 flex items-center justify-center">
             <div class="text-center">
@@ -288,8 +336,9 @@ export default function DataTable(props: DataTableProps) {
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-600">Show</span>
             <select
+              ref={pageSizeSelectRef}
               value={table.getState().pagination.pageSize}
-              onInput={(e) => table.setPageSize(Number(e.currentTarget.value))}
+              onInput={handlePageSizeChange}
               class="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 cursor-pointer"
             >
               <For each={[10, 25, 50, 100]}>
@@ -301,10 +350,11 @@ export default function DataTable(props: DataTableProps) {
 
           <div class="relative w-full sm:w-64">
             <input
+              ref={searchInputRef}
               type="text"
               placeholder="Search..."
               value={globalFilter()}
-              onInput={(e) => handleSearchInput(e.currentTarget.value)}
+              onInput={handleSearchInput}
               class="border border-gray-300 rounded-md px-4 py-1.5 text-sm w-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
             <Show when={globalFilter() !== debouncedGlobalFilter()}>
