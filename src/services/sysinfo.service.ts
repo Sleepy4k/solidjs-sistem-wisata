@@ -1,4 +1,4 @@
-import { println } from "@utils";
+import { println, error as toastError } from "@utils";
 import api from "./api.service";
 import { EDebugType } from "@enums";
 
@@ -12,6 +12,7 @@ const getSystemInformation = async () => {
     return response.data.data;
   } catch (error) {
     println("System Information", "Gagal mengambil informasi sistem", EDebugType.ERROR);
+    toastError("Gagal mengambil informasi sistem.", "Error");
   }
 };
 

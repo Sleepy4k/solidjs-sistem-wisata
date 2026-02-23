@@ -1,4 +1,4 @@
-import { println } from "@utils";
+import { println, error as toastError } from "@utils";
 import api from "./api.service"
 import { EDebugType } from "@enums";
 
@@ -14,6 +14,7 @@ const getSidebarItems = async (isCanLoad: boolean) => {
     return response.data.data;
   } catch (error) {
     println("Sidebar", "Gagal mengambil data sidebar items", EDebugType.ERROR);
+    toastError("Gagal mengambil menu sidebar.", "Error");
   }
 };
 

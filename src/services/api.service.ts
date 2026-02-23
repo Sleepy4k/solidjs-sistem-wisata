@@ -1,6 +1,6 @@
 import axios from "axios";
 import { BACKEND_URL, EMAIL_KEY_PREFIX, TOKEN_KEY_PREFIX } from "@consts";
-import { LocalStorage, println } from "@utils";
+import { LocalStorage, println, error as toastError } from "@utils";
 import { EDebugType } from "@enums";
 
 const api = axios.create({
@@ -29,6 +29,7 @@ api.interceptors.response.use(
         const { success, message } = response.data;
         if (!success) {
           println("Autentikasi gagal", message, EDebugType.ERROR);
+          toastError(message || "Autentikasi gagal.", "Error");
           LocalStorage.removeItem(TOKEN_KEY_PREFIX);
           LocalStorage.removeItem(EMAIL_KEY_PREFIX);
           window.location.href = "/login";

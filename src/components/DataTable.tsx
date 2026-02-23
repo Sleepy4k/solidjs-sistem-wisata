@@ -32,13 +32,14 @@ interface ActionProp {
   onDelete?: (row: any) => void;
 }
 
-interface DataTableProps {
+interface DataTableProps<T = any> {
   endpoint: string;
-  columns: Resource<any[]>;
+  columns: Resource<T[] | undefined>;
   action: ActionProp;
+  refreshTrigger?: number;
 }
 
-export default function DataTable(props: DataTableProps) {
+export default function DataTable<T = any>(props: DataTableProps<T>) {
   const [draw, setDraw] = createSignal<number>(0);
   const [data, setData] = createSignal<any[]>([]);
   const [columns, setColumns] = createSignal<ColumnDef<any>[]>([]);
@@ -64,7 +65,7 @@ export default function DataTable(props: DataTableProps) {
 
   const fetchConfig = async () => {
     try {
-      const colsData = props.columns() || [];
+      const colsData = (props.columns() || []) as unknown as BackendColumn[];
 
       setColumns(
         colsData.map((col: BackendColumn) => ({
@@ -283,6 +284,15 @@ export default function DataTable(props: DataTableProps) {
       ([loading]) => !loading && fetchData()
     )
   );
+
+  // external refresh trigger (e.g. parent updated data)
+  createEffect(() => {
+    const t = props.refreshTrigger;
+    if (t !== undefined) {
+      // attempt to fetch new data when trigger changes
+      fetchData();
+    }
+  });
 
   const table = createSolidTable({
     get data() {

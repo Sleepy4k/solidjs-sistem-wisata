@@ -11,6 +11,10 @@ export const protectedRoutes: RouteDefinition[] = [
     component: lazy(() => import("@pages/dashboard/business")),
   },
   {
+    path: "/tambah-usaha/:role",
+    component: lazy(() => import("@pages/dashboard/add-business")),
+  },
+  {
     path: "/profile",
     component: lazy(() => import("@pages/dashboard/profile/home")),
   },

@@ -3,7 +3,7 @@ import { api } from "@services";
 import { useNavigate } from "@solidjs/router";
 import { Auth, Meta } from "@contexts";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
-import { println } from "@utils";
+import { println, success, error as toastError } from "@utils";
 import Fa from "solid-fa";
 import {
   faEnvelope,
@@ -100,6 +100,7 @@ const Login: Component = () => {
         updateData(EAuthUpdateCategory.TOKEN, access_token);
 
         println("Login", message, EDebugType.SUCCESS);
+        success(message || "Berhasil masuk.", "Berhasil");
         navigate("/", { replace: true });
       })
       .catch((error) => {
@@ -110,6 +111,7 @@ const Login: Component = () => {
             "Satu atau lebih input tidak valid.",
             EDebugType.ERROR
           );
+          toastError("Satu atau lebih input tidak valid.", "Error");
           setErrors(responseData.errors);
         } else if (error.response && error.response.status === 401) {
           const responseData = error.response.data;
@@ -118,6 +120,7 @@ const Login: Component = () => {
             "Email atau kata sandi salah. Silakan coba lagi.",
             EDebugType.ERROR
           );
+          toastError("Email atau kata sandi salah.", "Error");
           setErrors(responseData.errors);
         } else {
           println(
@@ -125,6 +128,7 @@ const Login: Component = () => {
             "Seperti ada yang tidak beres. Jika masalah berlanjut, silakan hubungi administrator.",
             EDebugType.ERROR
           );
+          toastError("Terjadi kesalahan saat login.", "Error");
         }
       })
       .finally(() => {

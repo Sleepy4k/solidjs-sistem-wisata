@@ -12,7 +12,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { api } from "@services";
 import { A } from "@solidjs/router";
-import { getObjectLength, println } from "@utils";
+import { getObjectLength, println, success, error as toastError } from "@utils";
 import Fa from "solid-fa";
 import {
   Component,
@@ -221,6 +221,7 @@ const EditProfile: Component = () => {
         "Profil berhasil diperbarui.",
         EDebugType.SUCCESS
       );
+      success("Profil berhasil diperbarui.", "Berhasil");
       updateData(EAuthUpdateCategory.USER, {
         ...user(),
         name: nameInput.value.trim(),
@@ -231,6 +232,7 @@ const EditProfile: Component = () => {
         setErrors(error.response.data.errors);
       }
       println("Edit Profile", "Gagal memperbarui profil.", EDebugType.ERROR);
+      toastError("Gagal memperbarui profil.", "Error");
     } finally {
       setLoading(false);
       submitProfileButton.innerHTML = oldContent;
@@ -262,6 +264,7 @@ const EditProfile: Component = () => {
         "Kata sandi berhasil diperbarui.",
         EDebugType.SUCCESS
       );
+      success("Kata sandi berhasil diperbarui.", "Berhasil");
     } catch (error: any) {
       if (error.response?.data?.errors) {
         setErrors(error.response.data.errors);
@@ -271,6 +274,7 @@ const EditProfile: Component = () => {
         "Gagal memperbarui kata sandi.",
         EDebugType.ERROR
       );
+      toastError("Gagal memperbarui kata sandi.", "Error");
     } finally {
       setLoading(false);
       currentPasswordInput.value = "";

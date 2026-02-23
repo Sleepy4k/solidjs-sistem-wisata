@@ -4,7 +4,7 @@ import { createSignal, createEffect, Component, Show } from "solid-js";
 import { EMAIL_KEY_PREFIX, TOKEN_KEY_PREFIX } from "@consts";
 import { IAuthUserData, IProviderProp } from "./interface";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
-import { LocalStorage, println } from "@utils";
+import { LocalStorage, println, success, error as toastError } from "@utils";
 import { api } from "@services";
 
 const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
@@ -41,8 +41,10 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
 
         if (!success) {
           println("Logout Gagal", message, EDebugType.WARN);
+          toastError(message || "Logout gagal.", "Error");
         } else {
           println("Logout Berhasil", message, EDebugType.SUCCESS);
+          success(message || "Logout berhasil.", "Berhasil");
         }
       })
       .catch((error) => {
@@ -112,10 +114,11 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
             });
         })
         .catch((error) => {
-          println("Pengecekan Sesi Error", error.message, EDebugType.ERROR);
-          LocalStorage.removeItem(TOKEN_KEY_PREFIX);
-          LocalStorage.removeItem(EMAIL_KEY_PREFIX);
-        })
+        println("Pengecekan Sesi Error", error.message, EDebugType.ERROR);
+        toastError("Sesi pengguna bermasalah.", "Error");
+        LocalStorage.removeItem(TOKEN_KEY_PREFIX);
+        LocalStorage.removeItem(EMAIL_KEY_PREFIX);
+      })
         .finally(() => {
           setChecked(true);
         });

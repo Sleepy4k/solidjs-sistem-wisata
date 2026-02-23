@@ -12,6 +12,7 @@ import {
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
 import { getSummaryData, getSystemInformation } from "@services";
+import { ISummaryData } from "../../types/dashboard";
 import { formatCurrency, getObjectLength, pluralize } from "@utils";
 import Fa from "solid-fa";
 import { Component, createResource, For, onMount, Show } from "solid-js";
@@ -47,7 +48,7 @@ const Home: Component = () => {
   const { user } = Auth.useAuth();
   const { changeTitle } = Meta.useMeta();
   const [sysInfo, _] = createResource(getSystemInformation);
-  const [summaryData, __] = createResource(getSummaryData);
+  const [summaryData, __] = createResource<ISummaryData | undefined>(getSummaryData);
 
   onMount(() => {
     changeTitle("Dashboard");

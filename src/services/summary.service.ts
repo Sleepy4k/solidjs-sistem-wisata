@@ -1,26 +1,12 @@
-import { println } from "@utils";
+import { println, error as toastError } from "@utils";
 import api from "./api.service";
 import { EDebugType } from "@enums";
 
-interface SummaryData {
-  roles: { [key: string]: string }[];
-  menus: { [key: string]: MenuItem[] };
-  summary: Summary;
-}
+import { ISummaryData } from "../types/dashboard";
 
-interface MenuItem {
-  name: string;
-  prefix: 'pokdarwis' | 'bumdes';
-}
+// NOTE: use path alias to types may require tsconfig mapping; using relative import to be safe
 
-interface Summary {
-  [key: string]: {
-    total_income: string;
-    total_outcome: string;
-  };
-}
-
-const getSummaryData = async (isCanLoad: boolean): Promise<SummaryData | undefined> => {
+const getSummaryData = async (isCanLoad: boolean): Promise<ISummaryData | undefined> => {
   if (!isCanLoad) return;
 
   try {
@@ -32,6 +18,7 @@ const getSummaryData = async (isCanLoad: boolean): Promise<SummaryData | undefin
     return response.data.data;
   } catch (error) {
     println("Summary", "Gagal mengambil data summary", EDebugType.ERROR);
+    toastError("Gagal mengambil data ringkasan.", "Error");
   }
 };
 

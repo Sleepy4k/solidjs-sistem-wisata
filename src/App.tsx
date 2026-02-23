@@ -4,6 +4,7 @@ import { Route, Router, RouteSectionProps } from "@solidjs/router";
 import { AuthLayout, DashboardLayout, ErrorLayout } from "@layouts";
 import { guestRoutes, notfoundRoute, protectedRoutes } from "./routes";
 import TopLoader from "@components/TopLoader";
+import Toast from "@components/Toast";
 
 const DashboardWrapper = (props: RouteSectionProps) => {
   return <DashboardLayout>{props.children}</DashboardLayout>;
@@ -25,6 +26,7 @@ const App: Component = () => {
           <Auth.AuthProvider>
             <>
               <TopLoader />
+              <Toast />
               {props.children}
             </>
           </Auth.AuthProvider>
