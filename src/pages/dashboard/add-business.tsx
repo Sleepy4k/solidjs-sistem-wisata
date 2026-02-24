@@ -30,7 +30,16 @@ interface BusinessField {
   expanded: boolean;
 }
 
-// build catalog once and normalize to dashed names (faShoppingCart → "shopping-cart")
+type FormulaOperator = "*" | "+" | "-" | "/";
+
+interface Formula {
+  id: string;
+  fieldA: string;   
+  operator: FormulaOperator;
+  fieldB: string;   
+  result: string;   
+}
+
 const iconCatalog = Object.entries(solidIcons)
   .filter(([k]) => k.startsWith("fa") && k !== "fas" && k !== "prefix")
   .map(([k, icon]) => {
@@ -41,7 +50,6 @@ const iconCatalog = Object.entries(solidIcons)
     return { name, icon };
   });
 
-// map for quick lookup in picker/preview
 const iconMap = new Map(iconCatalog.map((i) => [i.name, i.icon]));
 
 const INPUT_TYPES = [
@@ -70,10 +78,23 @@ const TYPE_COLORS: Record<string, string> = {
   boolean: "bg-teal-50 text-teal-600",
 };
 
+const OPERATOR_LABELS: Record<FormulaOperator, string> = {
+  "*": "×  Kali",
+  "+": "+  Tambah",
+  "-": "−  Kurang",
+  "/": "÷  Bagi",
+};
+
+const OPERATOR_SYMBOLS: Record<FormulaOperator, string> = {
+  "*": "×",
+  "+": "+",
+  "-": "−",
+  "/": "÷",
+};
+
 const generateId = (): string =>
   Math.random().toString(36).slice(2) + Date.now().toString(36);
 
-// validation rule builder sits at module scope so it doesn't get reallocated
 function buildValidationRules(f: BusinessField): string[] {
   const rules: string[] = [];
   if (f.required) rules.push("required");
@@ -96,7 +117,6 @@ function buildValidationRules(f: BusinessField): string[] {
     case "url":
       rules.push("url");
       break;
-    // date/datetime/boolean/select don't require extra rules here
   }
   if (f.type === "select" && f.options.length) {
     const vals = f.options.map((o) => o.value).filter(Boolean).join(",");
@@ -114,28 +134,70 @@ function serializeField(f: BusinessField, index: number) {
     order: index + 1,
     placeholder: f.placeholder,
     validation_rules: buildValidationRules(f),
-    options: f.type === "select" ? f.options.map((o) => o.value).filter(Boolean) : [],
+    options:
+      f.type === "select"
+        ? f.options
+            .map((o) => ({ value: o.value, label: o.label }))
+            .filter((o) => o.value)
+        : [],
   };
 }
+
+const placeholderFor = (lbl: string): string => {
+  if (!lbl) return "";
+  const first = lbl.charAt(0).toLowerCase();
+  const rest = lbl.slice(1);
+  return `Masukkan ${first}${rest}`;
+};
+
+const slugify = (str: string) =>
+  str
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "");
 
 const toSlugLocal = (str: string) =>
   str.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
 
 const defaultFields = (): BusinessField[] => [
   {
-    id: generateId(), label: "Tanggal Transaksi", name: "transaction_date",
-    type: "date", order: 1, placeholder: "Masukan Tanggal Transaksi", required: true, filterable: true,
-    validation: {}, options: [], expanded: false,
+    id: generateId(),
+    label: "Tanggal Transaksi",
+    name: "transaction_date",
+    type: "date",
+    order: 1,
+    placeholder: placeholderFor("Tanggal Transaksi"),
+    required: true,
+    filterable: true,
+    validation: {},
+    options: [],
+    expanded: false,
   },
   {
-    id: generateId(), label: "Jumlah", name: "amount",
-    type: "currency", order: 2, placeholder: "0", required: true, filterable: false,
-    validation: { min: 0 }, options: [], expanded: false,
+    id: generateId(),
+    label: "Jumlah",
+    name: "amount",
+    type: "currency",
+    order: 2,
+    placeholder: "0",
+    required: true,
+    filterable: false,
+    validation: { min: 0 },
+    options: [],
+    expanded: false,
   },
   {
-    id: generateId(), label: "Keterangan", name: "description",
-    type: "textarea", order: 3, placeholder: "Masukkan keterangan", required: false, filterable: false,
-    validation: {}, options: [], expanded: false,
+    id: generateId(),
+    label: "Keterangan",
+    name: "description",
+    type: "textarea",
+    order: 3,
+    placeholder: placeholderFor("Keterangan"),
+    required: false,
+    filterable: false,
+    validation: {},
+    options: [],
+    expanded: false,
   },
 ];
 
@@ -152,6 +214,8 @@ const AddBusiness: Component = () => {
   const [iconPickerOpen, setIconPickerOpen] = createSignal(false);
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [fields, setFields] = createStore<BusinessField[]>(defaultFields());
+  const [formulas, setFormulas] = createStore<Formula[]>([]);
+  const [dragIndex, setDragIndex] = createSignal<number | null>(null);
 
   const filteredIcons = createMemo(() =>
     iconSearch()
@@ -163,24 +227,345 @@ const AddBusiness: Component = () => {
     selectedIcon() ? iconMap.get(selectedIcon()!) || null : null
   );
 
+  const numericFields = createMemo(() =>
+    fields.filter((f) => f.type === "number" || f.type === "currency")
+  );
+
   const addField = () =>
     setFields((f) => [
       ...f,
       {
         id: generateId(), label: "Field Baru", name: "field_baru",
-        type: "text", order: f.length + 1, placeholder: "",
+        type: "text", order: f.length + 1, placeholder: placeholderFor("Field Baru"),
         required: false, filterable: false, validation: {}, options: [], expanded: true,
       },
     ]);
 
-  const removeField = (id: string) =>
+  const removeField = (id: string) => {
+    const field = fields.find((f) => f.id === id);
+    if (field) {
+      setFormulas((fs) => fs.filter(
+        (formula) => formula.fieldA !== field.name && formula.fieldB !== field.name && formula.result !== field.name
+      ));
+    }
     setFields((f) => f.filter((field) => field.id !== id));
+  };
 
   const toggleExpand = (id: string) =>
     setFields((f) => f.id === id, "expanded", (v) => !v);
 
-  const updateField = (id: string, key: keyof BusinessField, value: any) =>
+  const updateField = (id: string, key: keyof BusinessField, value: any) => {
+    const oldField = fields.find((f) => f.id === id);
+    const oldName = oldField?.name;
     setFields((f) => f.id === id, key as any, value);
+    if (key === "name" && oldName && oldName !== value) {
+      setFormulas(
+        (formula) =>
+          formula.fieldA === oldName ||
+          formula.fieldB === oldName ||
+          formula.result === oldName,
+        (formula) => ({
+          ...formula,
+          fieldA: formula.fieldA === oldName ? value : formula.fieldA,
+          fieldB: formula.fieldB === oldName ? value : formula.fieldB,
+          result: formula.result === oldName ? value : formula.result,
+        })
+      );
+    }
+  };
+
+  const updateLabel = (id: string, label: string) => {
+    updateField(id, "label", label);
+    updateField(id, "name", toSlugLocal(label));
+    updateField(id, "placeholder", placeholderFor(label));
+  };
+
+  const onDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+
+  const onDrop = (targetIndex: number) => {
+    const from = dragIndex();
+    if (from === null || from === targetIndex) return;
+    setFields((f) => {
+      const updated = [...f];
+      const [moved] = updated.splice(from, 1);
+      updated.splice(targetIndex, 0, moved);
+      return updated.map((fld, idx) => ({ ...fld, order: idx + 1 }));
+    });
+    setDragIndex(null);
+  };
+
+  const onDragEnd = () => {
+    setDragIndex(null);
+  };
+
+  const FieldItem: Component<{ field: BusinessField; idx: number }> = (props) => {
+    const { field, idx } = props;
+    const dragging = () => dragIndex() === idx;
+
+    return (
+      <div
+        class="bg-gray-50 rounded-xl border border-gray-200/60 overflow-hidden"
+        draggable={true}
+        onDragStart={() => onDragStart(idx)}
+        onDragOver={onDragOver}
+        onDrop={() => onDrop(idx)}
+        onDragEnd={onDragEnd}
+        classList={{ "opacity-50": dragging() }}
+      >
+        <div class="flex items-center gap-2.5 px-3.5 py-3">
+          <Fa icon={solidIcons.faGripVertical} class="text-gray-300 cursor-grab flex-shrink-0" />
+
+          <div class="w-5 h-5 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
+            <span class="text-[9px] font-bold text-gray-500">{idx + 1}</span>
+          </div>
+
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5">
+              <p class="text-sm font-semibold text-gray-800 truncate leading-tight">{field.label}</p>
+              <Show when={resultFieldNames().has(field.name)}>
+                <span class="flex-shrink-0 inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md bg-violet-100 text-violet-600">
+                  <Fa icon={solidIcons.faCalculator} class="text-[8px]" />
+                  AUTO
+                </span>
+              </Show>
+            </div>
+            <p class="text-[10px] text-gray-400 font-mono truncate">{field.name}</p>
+          </div>
+
+          <span class={`hidden sm:block text-[10px] font-bold px-2.5 py-1 rounded-lg ${TYPE_COLORS[field.type] ?? "bg-gray-100 text-gray-500"}`}>
+            {INPUT_TYPES.find((t) => t.value === field.type)?.label ?? field.type}
+          </span>
+
+          <div class="flex items-center gap-0.5">
+            <button
+              type="button"
+              class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-all cursor-pointer"
+              onClick={() => toggleExpand(field.id)}
+            >
+              <Fa icon={field.expanded ? solidIcons.faChevronUp : solidIcons.faChevronDown} class="text-xs" />
+            </button>
+            <button
+              type="button"
+              class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-300 hover:text-red-500 transition-all cursor-pointer"
+              onClick={() => removeField(field.id)}
+            >
+              <Fa icon={solidIcons.faTrash} class="text-[10px]" />
+            </button>
+          </div>
+        </div>
+
+        <Show when={field.expanded}>
+          <div class="border-t border-gray-200/60 bg-white px-4 py-4 space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class={labelCls}>Label</label>
+                <input
+                  type="text"
+                  class={inputCls}
+                  value={field.label}
+                  onInput={(e) => updateLabel(field.id, e.currentTarget.value)}
+                />
+              </div>
+              <div>
+                <label class={labelCls}>
+                  Nama Field <span class="normal-case font-normal tracking-normal text-gray-300">(snake_case)</span>
+                </label>
+                <input
+                  type="text"
+                  class={`${inputCls} font-mono`}
+                  value={field.name}
+                  onInput={(e) => updateField(field.id, "name", toSlugLocal(e.currentTarget.value))}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label class={labelCls}>Jenis Input</label>
+              <div class="flex flex-wrap gap-1.5">
+                <For each={INPUT_TYPES}>
+                  {(t) => (
+                    <button
+                      type="button"
+                      class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border"
+                      classList={{
+                        [`${TYPE_COLORS[t.value] ?? "bg-gray-800 text-white"} border-transparent shadow-sm`]:
+                          field.type === t.value,
+                        "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50":
+                          field.type !== t.value,
+                      }}
+                      onClick={() => updateField(field.id, "type", t.value)}
+                    >
+                      {t.label}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </div>
+
+            <div>
+              <label class={labelCls}>Petunjuk Pengisian</label>
+              <input
+                type="text"
+                class={inputCls}
+                placeholder="cth. Masukkan jumlah dalam rupiah..."
+                value={field.placeholder}
+                onInput={(e) => updateField(field.id, "placeholder", e.currentTarget.value)}
+              />
+            </div>
+
+            {sectionDivider("Aturan Validasi")}
+
+            <Show when={field.type === "number" || field.type === "currency"}>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class={labelCls}>Nilai Minimum</label>
+                  <input
+                    type="number"
+                    class={inputCls}
+                    placeholder="0"
+                    value={field.validation.min ?? ""}
+                    onInput={(e) => updateValidation(field.id, "min", e.currentTarget.value)}
+                  />
+                </div>
+                <div>
+                  <label class={labelCls}>Nilai Maksimum</label>
+                  <input
+                    type="number"
+                    class={inputCls}
+                    placeholder="Tidak dibatasi"
+                    value={field.validation.max ?? ""}
+                    onInput={(e) => updateValidation(field.id, "max", e.currentTarget.value)}
+                  />
+                </div>
+              </div>
+            </Show>
+
+            <Show when={field.type === "text" || field.type === "textarea" || field.type === "email" || field.type === "url"}>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class={labelCls}>Min Karakter</label>
+                  <input
+                    type="number"
+                    class={inputCls}
+                    placeholder="0"
+                    value={field.validation.minLength ?? ""}
+                    onInput={(e) => updateValidation(field.id, "minLength", e.currentTarget.value)}
+                  />
+                </div>
+                <div>
+                  <label class={labelCls}>Maks Karakter</label>
+                  <input
+                    type="number"
+                    class={inputCls}
+                    placeholder="Tidak dibatasi"
+                    value={field.validation.maxLength ?? ""}
+                    onInput={(e) => updateValidation(field.id, "maxLength", e.currentTarget.value)}
+                  />
+                </div>
+              </div>
+            </Show>
+
+            <Show when={field.type === "text"}>
+              <div class="space-y-3">
+                <div>
+                  <label class={labelCls}>
+                    Pola Regex <span class="normal-case font-normal tracking-normal text-gray-300">(opsional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    class={`${inputCls} font-mono`}
+                    placeholder="cth. ^[A-Z]{3}\d{4}$"
+                    value={field.validation.pattern ?? ""}
+                    onInput={(e) => updateValidation(field.id, "pattern", e.currentTarget.value)}
+                  />
+                </div>
+                <Show when={(field.validation.pattern ?? "").length > 0}>
+                  <div>
+                    <label class={labelCls}>Pesan Error Pola</label>
+                    <input
+                      type="text"
+                      class={inputCls}
+                      placeholder="cth. Format tidak sesuai"
+                      value={field.validation.patternMessage ?? ""}
+                      onInput={(e) => updateValidation(field.id, "patternMessage", e.currentTarget.value)}
+                    />
+                  </div>
+                </Show>
+              </div>
+            </Show>
+
+            <Show when={field.type === "date" || field.type === "datetime"}>
+              <p class="text-xs text-gray-300 italic">Validasi tanggal ditentukan saat input transaksi.</p>
+            </Show>
+
+            <Show when={field.type === "boolean" || field.type === "select"}>
+              <p class="text-xs text-gray-300 italic">Tidak ada aturan validasi untuk tipe ini.</p>
+            </Show>
+
+            <Show when={field.type === "select"}>
+              {sectionDivider("Daftar Pilihan")}
+              <div>
+                <div class="flex items-center justify-between mb-2.5">
+                  <p class="text-xs text-gray-400">Tambahkan opsi yang bisa dipilih</p>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
+                    onClick={() => addOption(field.id)}
+                  >
+                    <Fa icon={solidIcons.faPlus} class="text-[9px]" />
+                    Tambah pilihan
+                  </button>
+                </div>
+                <div class="space-y-2">
+                  <For each={field.options}>
+                    {(opt, idx) => (
+                      <div class="flex items-center gap-2">
+                        <input
+                          type="text"
+                          class={`${inputCls} flex-1`}
+                          placeholder="Label tampilan"
+                          value={opt.label}
+                          onInput={(e) => {
+                            updateOption(field.id, idx(), "label", e.currentTarget.value);
+                            updateOption(field.id, idx(), "value", toSlugLocal(e.currentTarget.value));
+                          }}
+                        />
+                        <input
+                          type="text"
+                          class={`${inputCls} w-32 font-mono text-xs`}
+                          placeholder="value"
+                          value={opt.value}
+                          onInput={(e) => updateOption(field.id, idx(), "value", e.currentTarget.value)}
+                        />
+                        <button
+                          type="button"
+                          class="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-xl transition-colors cursor-pointer flex-shrink-0"
+                          onClick={() => removeOption(field.id, idx())}
+                        >
+                          <Fa icon={solidIcons.faTimes} class="text-xs" />
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                  <Show when={field.options.length === 0}>
+                    <div class="border-2 border-dashed border-gray-100 rounded-xl py-5 flex items-center justify-center">
+                      <p class="text-xs text-gray-300">Belum ada pilihan</p>
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            </Show>
+          </div>
+        </Show>
+      </div>
+    );
+  };
 
   const updateValidation = (id: string, key: string, value: any) => {
     const stringKeys = ["pattern", "patternMessage"];
@@ -197,12 +582,51 @@ const AddBusiness: Component = () => {
   const removeOption = (fieldId: string, idx: number) =>
     setFields((f) => f.id === fieldId, "options", (opts) => opts.filter((_, i) => i !== idx));
 
+  const addFormula = () => {
+    const nf = numericFields();
+    if (nf.length < 2) return;
+    setFormulas((fs) => [
+      ...fs,
+      {
+        id: generateId(),
+        fieldA: nf[0]?.name ?? "",
+        operator: "*",
+        fieldB: nf[1]?.name ?? "",
+        result: nf[0]?.name ?? "",
+      },
+    ]);
+  };
+
+  const updateFormula = (id: string, key: keyof Formula, value: any) =>
+    setFormulas((f) => f.id === id, key as any, value);
+
+  const removeFormula = (id: string) =>
+    setFormulas((fs) => fs.filter((f) => f.id !== id));
+
+  const formulaError = (formula: Formula): string | null => {
+    if (!formula.fieldA || !formula.fieldB || !formula.result) return "Semua field harus dipilih.";
+    if (formula.fieldA === formula.fieldB) return "Field A dan Field B tidak boleh sama.";
+    if (formula.result === formula.fieldA || formula.result === formula.fieldB)
+      return "Field hasil tidak boleh sama dengan field input.";
+    return null;
+  };
+
+  const resultFieldNames = createMemo(() => new Set(formulas.map((f) => f.result)));
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     const name = businessName().trim();
     if (!name) {
       toastError("Nama usaha wajib diisi.", "Error");
       return;
+    }
+
+    for (const formula of formulas) {
+      const err = formulaError(formula);
+      if (err) {
+        toastError(`Formula tidak valid: ${err}`, "Error");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -216,6 +640,11 @@ const AddBusiness: Component = () => {
       const res = await api.post(`/dashboard/${params.role}/business`, payload);
 
       if (res.status === 200 || res.status === 201) {
+        const businessSlug = slugify(name);
+        const storageKey   = `formulas__${params.role}__${businessSlug}`;
+        const serialized   = formulas.map(({ id: _id, ...rest }) => rest);
+        localStorage.setItem(storageKey, JSON.stringify(serialized));
+
         changeSidebarRefresh(true);
         success("Usaha berhasil ditambahkan.", "Berhasil");
         navigate("/");
@@ -262,7 +691,6 @@ const AddBusiness: Component = () => {
           </div>
 
           <div class="px-5 py-5 space-y-5">
-
             <div>
               <label class={labelCls}>Nama Usaha</label>
               <input
@@ -359,7 +787,6 @@ const AddBusiness: Component = () => {
         </div>
 
         <div class="bg-white border border-gray-100 shadow-sm overflow-hidden rounded-2xl">
-
           <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
@@ -381,255 +808,7 @@ const AddBusiness: Component = () => {
           </div>
 
           <div class="p-3 space-y-2">
-
-            <For each={fields}>
-              {(field, idx) => (
-                <div class="bg-gray-50 rounded-xl border border-gray-200/60 overflow-hidden">
-
-                  <div class="flex items-center gap-2.5 px-3.5 py-3">
-                    <Fa icon={solidIcons.faGripVertical} class="text-gray-300 cursor-grab flex-shrink-0" />
-
-                    <div class="w-5 h-5 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
-                      <span class="text-[9px] font-bold text-gray-500">{idx() + 1}</span>
-                    </div>
-
-                    <div class="flex-1 min-w-0">
-                      <p class="text-sm font-semibold text-gray-800 truncate leading-tight">{field.label}</p>
-                      <p class="text-[10px] text-gray-400 font-mono truncate">{field.name}</p>
-                    </div>
-
-                    <span class={`hidden sm:block text-[10px] font-bold px-2.5 py-1 rounded-lg ${TYPE_COLORS[field.type] ?? "bg-gray-100 text-gray-500"}`}>
-                      {INPUT_TYPES.find((t) => t.value === field.type)?.label ?? field.type}
-                    </span>
-
-                    <div class="flex items-center gap-0.5">
-                      <button
-                        type="button"
-                        class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-all cursor-pointer"
-                        onClick={() => toggleExpand(field.id)}
-                      >
-                        <Fa icon={field.expanded ? solidIcons.faChevronUp : solidIcons.faChevronDown} class="text-xs" />
-                      </button>
-                      <button
-                        type="button"
-                        class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-300 hover:text-red-500 transition-all cursor-pointer"
-                        onClick={() => removeField(field.id)}
-                      >
-                        <Fa icon={solidIcons.faTrash} class="text-[10px]" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <Show when={field.expanded}>
-                    <div class="border-t border-gray-200/60 bg-white px-4 py-4 space-y-4">
-
-                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label class={labelCls}>Label</label>
-                          <input
-                            type="text"
-                            class={inputCls}
-                            value={field.label}
-                            onInput={(e) => {
-                              updateField(field.id, "label", e.currentTarget.value);
-                              updateField(field.id, "name", toSlugLocal(e.currentTarget.value));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label class={labelCls}>
-                            Nama Field <span class="normal-case font-normal tracking-normal text-gray-300">(snake_case)</span>
-                          </label>
-                          <input
-                            type="text"
-                            class={`${inputCls} font-mono`}
-                            value={field.name}
-                            onInput={(e) => updateField(field.id, "name", toSlugLocal(e.currentTarget.value))}
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label class={labelCls}>Jenis Input</label>
-                        <div class="flex flex-wrap gap-1.5">
-                          <For each={INPUT_TYPES}>
-                            {(t) => (
-                              <button
-                                type="button"
-                                class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer border"
-                                classList={{
-                                  [`${TYPE_COLORS[t.value] ?? "bg-gray-800 text-white"} border-transparent shadow-sm`]: field.type === t.value,
-                                  "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50": field.type !== t.value,
-                                }}
-                                onClick={() => updateField(field.id, "type", t.value)}
-                              >
-                                {t.label}
-                              </button>
-                            )}
-                          </For>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label class={labelCls}>Petunjuk Pengisian</label>
-                        <input
-                          type="text"
-                          class={inputCls}
-                          placeholder="cth. Masukkan jumlah dalam rupiah..."
-                          value={field.placeholder}
-                          onInput={(e) => updateField(field.id, "placeholder", e.currentTarget.value)}
-                        />
-                      </div>
-
-                      {sectionDivider("Aturan Validasi")}
-
-                      <Show when={field.type === "number" || field.type === "currency"}>
-                        <div class="grid grid-cols-2 gap-3">
-                          <div>
-                            <label class={labelCls}>Nilai Minimum</label>
-                            <input
-                              type="number"
-                              class={inputCls}
-                              placeholder="0"
-                              value={field.validation.min ?? ""}
-                              onInput={(e) => updateValidation(field.id, "min", e.currentTarget.value)}
-                            />
-                          </div>
-                          <div>
-                            <label class={labelCls}>Nilai Maksimum</label>
-                            <input
-                              type="number"
-                              class={inputCls}
-                              placeholder="Tidak dibatasi"
-                              value={field.validation.max ?? ""}
-                              onInput={(e) => updateValidation(field.id, "max", e.currentTarget.value)}
-                            />
-                          </div>
-                        </div>
-                      </Show>
-
-                      <Show when={field.type === "text" || field.type === "textarea" || field.type === "email" || field.type === "url"}>
-                        <div class="grid grid-cols-2 gap-3">
-                          <div>
-                            <label class={labelCls}>Min Karakter</label>
-                            <input
-                              type="number"
-                              class={inputCls}
-                              placeholder="0"
-                              value={field.validation.minLength ?? ""}
-                              onInput={(e) => updateValidation(field.id, "minLength", e.currentTarget.value)}
-                            />
-                          </div>
-                          <div>
-                            <label class={labelCls}>Maks Karakter</label>
-                            <input
-                              type="number"
-                              class={inputCls}
-                              placeholder="Tidak dibatasi"
-                              value={field.validation.maxLength ?? ""}
-                              onInput={(e) => updateValidation(field.id, "maxLength", e.currentTarget.value)}
-                            />
-                          </div>
-                        </div>
-                      </Show>
-
-                      <Show when={field.type === "text"}>
-                        <div class="space-y-3">
-                          <div>
-                            <label class={labelCls}>
-                              Pola Regex <span class="normal-case font-normal tracking-normal text-gray-300">(opsional)</span>
-                            </label>
-                            <input
-                              type="text"
-                              class={`${inputCls} font-mono`}
-                              placeholder="cth. ^[A-Z]{3}\d{4}$"
-                              value={field.validation.pattern ?? ""}
-                              onInput={(e) => updateValidation(field.id, "pattern", e.currentTarget.value)}
-                            />
-                          </div>
-                          <Show when={(field.validation.pattern ?? "").length > 0}>
-                            <div>
-                              <label class={labelCls}>Pesan Error Pola</label>
-                              <input
-                                type="text"
-                                class={inputCls}
-                                placeholder="cth. Format tidak sesuai"
-                                value={field.validation.patternMessage ?? ""}
-                                onInput={(e) => updateValidation(field.id, "patternMessage", e.currentTarget.value)}
-                              />
-                            </div>
-                          </Show>
-                        </div>
-                      </Show>
-
-                      <Show when={field.type === "date" || field.type === "datetime"}>
-                        <p class="text-xs text-gray-300 italic">Validasi tanggal ditentukan saat input transaksi.</p>
-                      </Show>
-
-                      <Show when={field.type === "boolean" || field.type === "select"}>
-                        <p class="text-xs text-gray-300 italic">Tidak ada aturan validasi untuk tipe ini.</p>
-                      </Show>
-
-                      <Show when={field.type === "select"}>
-                        {sectionDivider("Daftar Pilihan")}
-                        <div>
-                          <div class="flex items-center justify-between mb-2.5">
-                            <p class="text-xs text-gray-400">Tambahkan opsi yang bisa dipilih</p>
-                            <button
-                              type="button"
-                              class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
-                              onClick={() => addOption(field.id)}
-                            >
-                              <Fa icon={solidIcons.faPlus} class="text-[9px]" />
-                              Tambah pilihan
-                            </button>
-                          </div>
-                          <div class="space-y-2">
-                            <For each={field.options}>
-                              {(opt, idx) => (
-                                <div class="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    class={`${inputCls} flex-1`}
-                                    placeholder="Label tampilan"
-                                    value={opt.label}
-                                    onInput={(e) => {
-                                      updateOption(field.id, idx(), "label", e.currentTarget.value);
-                                      updateOption(field.id, idx(), "value", toSlugLocal(e.currentTarget.value));
-                                    }}
-                                  />
-                                  <input
-                                    type="text"
-                                    class={`${inputCls} w-32 font-mono text-xs`}
-                                    placeholder="value"
-                                    value={opt.value}
-                                    onInput={(e) => updateOption(field.id, idx(), "value", e.currentTarget.value)}
-                                  />
-                                  <button
-                                    type="button"
-                                    class="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-xl transition-colors cursor-pointer flex-shrink-0"
-                                    onClick={() => removeOption(field.id, idx())}
-                                  >
-                                    <Fa icon={solidIcons.faTimes} class="text-xs" />
-                                  </button>
-                                </div>
-                              )}
-                            </For>
-                            <Show when={field.options.length === 0}>
-                              <div class="border-2 border-dashed border-gray-100 rounded-xl py-5 flex items-center justify-center">
-                                <p class="text-xs text-gray-300">Belum ada pilihan</p>
-                              </div>
-                            </Show>
-                          </div>
-                        </div>
-                      </Show>
-
-                    </div>
-                  </Show>
-                </div>
-              )}
-            </For>
-
+            <For each={fields}>{(field, idx) => <FieldItem field={field} idx={idx()} />}</For>
             <Show when={fields.length === 0}>
               <div class="border-2 border-dashed border-gray-200 rounded-xl py-10 flex flex-col items-center justify-center text-center">
                 <div class="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
@@ -639,7 +818,161 @@ const AddBusiness: Component = () => {
                 <p class="text-xs text-gray-300 mt-0.5">Klik "Tambah Field" untuk mulai</p>
               </div>
             </Show>
+          </div>
+        </div>
 
+        <div class="bg-white border border-gray-100 shadow-sm overflow-hidden rounded-2xl">
+          <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center flex-shrink-0">
+                <Fa icon={solidIcons.faCalculator} class="text-white text-xs" />
+              </div>
+              <div>
+                <p class="text-sm font-bold text-gray-800">Kalkulasi Otomatis</p>
+                <p class="text-xs text-gray-400">Hitung field secara otomatis dari field lain</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={addFormula}
+              disabled={numericFields().length < 2}
+              class="inline-flex items-center gap-1.5 bg-violet-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-violet-700 active:scale-95 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+              title={numericFields().length < 2 ? "Butuh minimal 2 field angka/mata uang" : ""}
+            >
+              <Fa icon={solidIcons.faPlus} class="text-[9px]" />
+              Tambah Formula
+            </button>
+          </div>
+
+          <div class="p-3 space-y-2">
+            <Show when={numericFields().length < 2 && formulas.length === 0}>
+              <div class="border-2 border-dashed border-violet-100 rounded-xl py-8 flex flex-col items-center justify-center text-center">
+                <div class="w-10 h-10 bg-violet-50 rounded-2xl flex items-center justify-center mb-3">
+                  <Fa icon={solidIcons.faCalculator} class="text-violet-300" />
+                </div>
+                <p class="text-sm font-semibold text-gray-400">Belum ada formula</p>
+                <p class="text-xs text-gray-300 mt-0.5 max-w-[200px]">
+                  Tambahkan minimal 2 field bertipe Angka atau Mata Uang untuk membuat formula
+                </p>
+              </div>
+            </Show>
+
+            <For each={formulas}>
+              {(formula) => {
+                const err = () => formulaError(formula);
+                const fieldALabel = () => numericFields().find((f) => f.name === formula.fieldA)?.label ?? formula.fieldA;
+                const fieldBLabel = () => numericFields().find((f) => f.name === formula.fieldB)?.label ?? formula.fieldB;
+                const resultLabel = () => numericFields().find((f) => f.name === formula.result)?.label ?? formula.result;
+
+                return (
+                  <div class="bg-violet-50/50 rounded-xl border border-violet-100 overflow-hidden">
+                    <div class="flex items-center gap-2 px-3.5 py-2.5 bg-violet-50 border-b border-violet-100">
+                      <Fa icon={solidIcons.faCalculator} class="text-violet-400 text-xs flex-shrink-0" />
+                      <div class="flex-1 min-w-0 flex items-center gap-1.5 flex-wrap">
+                        <span class="text-xs font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-lg">{fieldALabel()}</span>
+                        <span class="text-sm font-bold text-violet-500">{OPERATOR_SYMBOLS[formula.operator]}</span>
+                        <span class="text-xs font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-lg">{fieldBLabel()}</span>
+                        <span class="text-xs text-violet-400">=</span>
+                        <span class="text-xs font-bold text-white bg-violet-600 px-2 py-0.5 rounded-lg">{resultLabel()}</span>
+                        <span class="text-[9px] font-semibold text-violet-400 ml-1">(otomatis)</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="w-6 h-6 flex items-center justify-center rounded-lg hover:bg-red-100 text-violet-300 hover:text-red-500 transition-all cursor-pointer flex-shrink-0"
+                        onClick={() => removeFormula(formula.id)}
+                      >
+                        <Fa icon={solidIcons.faTrash} class="text-[10px]" />
+                      </button>
+                    </div>
+
+                    <div class="px-4 py-3 space-y-3">
+                      <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 items-end">
+                        <div>
+                          <label class="block text-[10px] font-bold uppercase tracking-[0.12em] text-violet-400 mb-1.5">
+                            Field A
+                          </label>
+                          <select
+                            class="w-full px-3 py-2.5 text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all bg-white text-gray-800"
+                            value={formula.fieldA}
+                            onChange={(e) => updateFormula(formula.id, "fieldA", e.currentTarget.value)}
+                          >
+                            <For each={numericFields()}>
+                              {(f) => <option value={f.name}>{f.label}</option>}
+                            </For>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label class="block text-[10px] font-bold uppercase tracking-[0.12em] text-violet-400 mb-1.5">
+                            Operasi
+                          </label>
+                          <select
+                            class="w-full px-3 py-2.5 text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all bg-white text-gray-800"
+                            value={formula.operator}
+                            onChange={(e) => updateFormula(formula.id, "operator", e.currentTarget.value as FormulaOperator)}
+                          >
+                            <For each={Object.entries(OPERATOR_LABELS) as [FormulaOperator, string][]}>
+                              {([val, label]) => <option value={val}>{label}</option>}
+                            </For>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label class="block text-[10px] font-bold uppercase tracking-[0.12em] text-violet-400 mb-1.5">
+                            Field B
+                          </label>
+                          <select
+                            class="w-full px-3 py-2.5 text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all bg-white text-gray-800"
+                            value={formula.fieldB}
+                            onChange={(e) => updateFormula(formula.id, "fieldB", e.currentTarget.value)}
+                          >
+                            <For each={numericFields()}>
+                              {(f) => <option value={f.name}>{f.label}</option>}
+                            </For>
+                          </select>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label class="block text-[10px] font-bold uppercase tracking-[0.12em] text-violet-400 mb-1.5">
+                          Hasil Kalkulasi (field yang otomatis terisi)
+                        </label>
+                        <select
+                          class="w-full px-3 py-2.5 text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all bg-white text-gray-800"
+                          value={formula.result}
+                          onChange={(e) => updateFormula(formula.id, "result", e.currentTarget.value)}
+                        >
+                          <For each={numericFields()}>
+                            {(f) => <option value={f.name}>{f.label}</option>}
+                          </For>
+                        </select>
+                        <p class="mt-1.5 text-[10px] text-violet-400">
+                          Field ini akan menjadi <strong>read-only</strong> saat input transaksi dan nilainya dihitung otomatis.
+                        </p>
+                      </div>
+
+                      {/* Error */}
+                      <Show when={err()}>
+                        <div class="flex items-center gap-1.5 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                          <Fa icon={solidIcons.faExclamationTriangle} class="text-red-400 text-xs flex-shrink-0" />
+                          <p class="text-xs text-red-500 font-medium">{err()}</p>
+                        </div>
+                      </Show>
+                    </div>
+                  </div>
+                );
+              }}
+            </For>
+
+            <Show when={formulas.length === 0 && numericFields().length >= 2}>
+              <div class="border-2 border-dashed border-violet-100 rounded-xl py-8 flex flex-col items-center justify-center text-center">
+                <div class="w-10 h-10 bg-violet-50 rounded-2xl flex items-center justify-center mb-3">
+                  <Fa icon={solidIcons.faCalculator} class="text-violet-300" />
+                </div>
+                <p class="text-sm font-semibold text-gray-400">Belum ada formula</p>
+                <p class="text-xs text-gray-300 mt-0.5">Klik "Tambah Formula" untuk mulai</p>
+              </div>
+            </Show>
           </div>
         </div>
 
@@ -664,7 +997,6 @@ const AddBusiness: Component = () => {
             {isSubmitting() ? "Menyimpan..." : "Simpan Usaha"}
           </button>
         </div>
-
       </form>
     </div>
   );
