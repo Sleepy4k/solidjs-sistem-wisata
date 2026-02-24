@@ -22,6 +22,10 @@ export const protectedRoutes: RouteDefinition[] = [
     path: "/profile/edit",
     component: lazy(() => import("@pages/dashboard/profile/edit")),
   },
+  {
+    path: "/admin/users",
+    component: lazy(() => import("@pages/dashboard/admin/users")),
+  },
 ];
 
 export const guestRoutes: RouteDefinition[] = [

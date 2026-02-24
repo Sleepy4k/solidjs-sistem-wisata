@@ -47,8 +47,10 @@ const guideSteps = [
 const Home: Component = () => {
   const { user } = Auth.useAuth();
   const { changeTitle } = Meta.useMeta();
-  const [sysInfo, _] = createResource(getSystemInformation);
-  const [summaryData, __] = createResource<ISummaryData | undefined>(getSummaryData);
+  const [sysInfo] = createResource(getSystemInformation);
+  const [summaryData] = createResource<ISummaryData | undefined>(
+    getSummaryData,
+  );
 
   onMount(() => {
     changeTitle("Dashboard");
@@ -281,7 +283,7 @@ const Home: Component = () => {
                                         .map(
                                           (word) =>
                                             word.charAt(0).toUpperCase() +
-                                            word.slice(1)
+                                            word.slice(1),
                                         )
                                         .join(" ")}
                                     </strong>
@@ -319,12 +321,12 @@ const Home: Component = () => {
                   {user()?.name || "User"}
                 </span>
               </div>
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                <span class="text-sm text-gray-600 flex items-center gap-2">
+              <div class="flex justify-between items-center gap-2 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                <span class="text-sm text-gray-600 flex items-center gap-2 flex-shrink-0">
                   <Fa icon={faEnvelope} class="text-purple-500" />
                   Email
                 </span>
-                <span class="font-semibold text-gray-900">
+                <span class="font-semibold text-gray-900 truncate text-right min-w-0">
                   {user()?.email || "example@gmail.com"}
                 </span>
               </div>

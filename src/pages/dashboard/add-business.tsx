@@ -2,7 +2,7 @@ import { Meta } from "@contexts";
 import * as solidIcons from "@fortawesome/free-solid-svg-icons";
 import { useParams, useNavigate } from "@solidjs/router";
 import { ucFirst, success, error as toastError } from "@utils";
-import { api } from "@services";
+import { api, saveFormulas } from "@services";
 import Fa from "solid-fa";
 import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
@@ -34,10 +34,12 @@ type FormulaOperator = "*" | "+" | "-" | "/";
 
 interface Formula {
   id: string;
-  fieldA: string;   
+  field_a: string;
   operator: FormulaOperator;
-  fieldB: string;   
-  result: string;   
+  field_b: string;
+  result: string;
+  result_label: string;
+  order: number;
 }
 
 const iconCatalog = Object.entries(solidIcons)
@@ -79,16 +81,16 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const OPERATOR_LABELS: Record<FormulaOperator, string> = {
-  "*": "×  Kali",
+  "*": "x  Kali",
   "+": "+  Tambah",
-  "-": "−  Kurang",
+  "-": "-  Kurang",
   "/": "÷  Bagi",
 };
 
 const OPERATOR_SYMBOLS: Record<FormulaOperator, string> = {
-  "*": "×",
+  "*": "x",
   "+": "+",
-  "-": "−",
+  "-": "-",
   "/": "÷",
 };
 
@@ -245,7 +247,7 @@ const AddBusiness: Component = () => {
     const field = fields.find((f) => f.id === id);
     if (field) {
       setFormulas((fs) => fs.filter(
-        (formula) => formula.fieldA !== field.name && formula.fieldB !== field.name && formula.result !== field.name
+        (formula) => formula.field_a !== field.name && formula.field_b !== field.name && formula.result !== field.name
       ));
     }
     setFields((f) => f.filter((field) => field.id !== id));
@@ -261,14 +263,17 @@ const AddBusiness: Component = () => {
     if (key === "name" && oldName && oldName !== value) {
       setFormulas(
         (formula) =>
-          formula.fieldA === oldName ||
-          formula.fieldB === oldName ||
+          formula.field_a === oldName ||
+          formula.field_b === oldName ||
           formula.result === oldName,
         (formula) => ({
           ...formula,
-          fieldA: formula.fieldA === oldName ? value : formula.fieldA,
-          fieldB: formula.fieldB === oldName ? value : formula.fieldB,
+          field_a: formula.field_a === oldName ? value : formula.field_a,
+          field_b: formula.field_b === oldName ? value : formula.field_b,
           result: formula.result === oldName ? value : formula.result,
+          result_label: formula.result === oldName
+            ? (fields.find((f) => f.name === value)?.label ?? value)
+            : formula.result_label,
         })
       );
     }
@@ -589,24 +594,31 @@ const AddBusiness: Component = () => {
       ...fs,
       {
         id: generateId(),
-        fieldA: nf[0]?.name ?? "",
+        field_a: nf[0]?.name ?? "",
         operator: "*",
-        fieldB: nf[1]?.name ?? "",
+        field_b: nf[1]?.name ?? "",
         result: nf[0]?.name ?? "",
+        result_label: nf[0]?.label ?? "",
+        order: fs.length + 1,
       },
     ]);
   };
 
-  const updateFormula = (id: string, key: keyof Formula, value: any) =>
+  const updateFormula = (id: string, key: keyof Formula, value: any) => {
     setFormulas((f) => f.id === id, key as any, value);
+    if (key === "result") {
+      const label = fields.find((f) => f.name === value)?.label ?? value;
+      setFormulas((f) => f.id === id, "result_label", label);
+    }
+  };
 
   const removeFormula = (id: string) =>
     setFormulas((fs) => fs.filter((f) => f.id !== id));
 
   const formulaError = (formula: Formula): string | null => {
-    if (!formula.fieldA || !formula.fieldB || !formula.result) return "Semua field harus dipilih.";
-    if (formula.fieldA === formula.fieldB) return "Field A dan Field B tidak boleh sama.";
-    if (formula.result === formula.fieldA || formula.result === formula.fieldB)
+    if (!formula.field_a || !formula.field_b || !formula.result) return "Semua field harus dipilih.";
+    if (formula.field_a === formula.field_b) return "Field A dan Field B tidak boleh sama.";
+    if (formula.result === formula.field_a || formula.result === formula.field_b)
       return "Field hasil tidak boleh sama dengan field input.";
     return null;
   };
@@ -641,9 +653,17 @@ const AddBusiness: Component = () => {
 
       if (res.status === 200 || res.status === 201) {
         const businessSlug = slugify(name);
-        const storageKey   = `formulas__${params.role}__${businessSlug}`;
-        const serialized   = formulas.map(({ id: _id, ...rest }) => rest);
-        localStorage.setItem(storageKey, JSON.stringify(serialized));
+        const serialized = formulas.map((f, idx) => ({
+          result: f.result,
+          result_label: f.result_label || fields.find((fld) => fld.name === f.result)?.label || f.result,
+          field_a: f.field_a,
+          operator: f.operator,
+          field_b: f.field_b,
+          order: idx + 1,
+        }));
+        if (serialized.length > 0) {
+          await saveFormulas({ role: params.role, slug: businessSlug }, serialized);
+        }
 
         changeSidebarRefresh(true);
         success("Usaha berhasil ditambahkan.", "Berhasil");
@@ -860,8 +880,8 @@ const AddBusiness: Component = () => {
             <For each={formulas}>
               {(formula) => {
                 const err = () => formulaError(formula);
-                const fieldALabel = () => numericFields().find((f) => f.name === formula.fieldA)?.label ?? formula.fieldA;
-                const fieldBLabel = () => numericFields().find((f) => f.name === formula.fieldB)?.label ?? formula.fieldB;
+                const fieldALabel = () => numericFields().find((f) => f.name === formula.field_a)?.label ?? formula.field_a;
+                const fieldBLabel = () => numericFields().find((f) => f.name === formula.field_b)?.label ?? formula.field_b;
                 const resultLabel = () => numericFields().find((f) => f.name === formula.result)?.label ?? formula.result;
 
                 return (
@@ -893,8 +913,8 @@ const AddBusiness: Component = () => {
                           </label>
                           <select
                             class="w-full px-3 py-2.5 text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all bg-white text-gray-800"
-                            value={formula.fieldA}
-                            onChange={(e) => updateFormula(formula.id, "fieldA", e.currentTarget.value)}
+                            value={formula.field_a}
+                            onChange={(e) => updateFormula(formula.id, "field_a", e.currentTarget.value)}
                           >
                             <For each={numericFields()}>
                               {(f) => <option value={f.name}>{f.label}</option>}
@@ -923,8 +943,8 @@ const AddBusiness: Component = () => {
                           </label>
                           <select
                             class="w-full px-3 py-2.5 text-sm border border-violet-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all bg-white text-gray-800"
-                            value={formula.fieldB}
-                            onChange={(e) => updateFormula(formula.id, "fieldB", e.currentTarget.value)}
+                            value={formula.field_b}
+                            onChange={(e) => updateFormula(formula.id, "field_b", e.currentTarget.value)}
                           >
                             <For each={numericFields()}>
                               {(f) => <option value={f.name}>{f.label}</option>}

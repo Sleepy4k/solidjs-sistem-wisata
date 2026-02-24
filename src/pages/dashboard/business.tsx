@@ -1,5 +1,5 @@
 import DataTable from "@components/DataTable";
-import { Auth, Meta } from "@contexts";
+import { Meta } from "@contexts";
 import {
   faArrowDown,
   faArrowUp,
@@ -20,33 +20,41 @@ import {
   faTimes,
   faWallet,
 } from "@fortawesome/free-solid-svg-icons";
-import { getCardsData, getColumnsData, getFieldsData, api } from "@services";
+import { getCardsData, getColumnsData, getFieldsData, getFormulas, api } from "@services";
 import { IField, IFieldOption, ICard, IColumn } from "../../types/dashboard";
-import { Params, useParams } from "@solidjs/router";
-import { formatCurrency, toSlug, ucFirst, ucWords, success, error as toastError } from "@utils";
+import { Params, useParams, useSearchParams } from "@solidjs/router";
+import {
+  formatCurrency,
+  toSlug,
+  ucFirst,
+  ucWords,
+  success,
+  error as toastError,
+} from "@utils";
 import Fa from "solid-fa";
 import {
+  Accessor,
   Component,
   createEffect,
+  createMemo,
   createResource,
   createSignal,
   For,
   Match,
-  onCleanup,
-  onMount,
   Show,
   Switch,
-  Resource,
 } from "solid-js";
 
-// ─── Formula types (must match what AddBusiness serialises) ───────────────────
 type FormulaOperator = "*" | "+" | "-" | "/";
 
 interface Formula {
-  fieldA: string;
+  id?: string;
+  field_a: string;
   operator: FormulaOperator;
-  fieldB: string;
-  result: string;   // this field is read-only / computed
+  field_b: string;
+  result: string;
+  result_label?: string;
+  order?: number;
 }
 
 interface IParamData extends Params {
@@ -54,65 +62,115 @@ interface IParamData extends Params {
   slug?: string;
 }
 
-const buttons = [
-  { id: "add-data",      icon: faPlus,      color: "blue",  text: "Tambah Data",   mobileText: "Tambah" },
-  { id: "export-excel",  icon: faFileExcel, color: "green", text: "Export Excel",  mobileText: "Excel"  },
-  { id: "export-pdf",    icon: faFilePdf,   color: "red",   text: "Export PDF",    mobileText: "PDF"    },
-  { id: "print-table",   icon: faPrint,     color: "gray",  text: "Cetak Tabel",   mobileText: "Cetak"  },
-];
-
 const cardMetaData = (cardName: string) => {
   switch (cardName.toLowerCase()) {
-    case "total-transactions":      return { color: "blue",  icon: faDatabase };
-    case "transactions-this-month": return { color: "green", icon: faCalendar };
-    case "total-income":            return { color: "green", icon: faArrowUp   };
-    case "total-outcome":           return { color: "red",   icon: faArrowDown };
-    case "net-balance":             return { color: "blue",  icon: faWallet    };
-    default:                        return { color: "gray",  icon: faMoneyBill };
+    case "total-transactions":
+      return { color: "blue", icon: faDatabase };
+    case "transactions-this-month":
+      return { color: "green", icon: faCalendar };
+    case "total-income":
+      return { color: "green", icon: faArrowUp };
+    case "total-outcome":
+      return { color: "red", icon: faArrowDown };
+    case "net-balance":
+      return { color: "blue", icon: faWallet };
+    default:
+      return { color: "gray", icon: faMoneyBill };
   }
 };
 
-// ─── Evaluate a single formula given current form values ─────────────────────
-function evaluateFormula(formula: Formula, values: Record<string, number>): number | null {
-  const a = values[formula.fieldA];
-  const b = values[formula.fieldB];
+function evaluateFormula(
+  formula: Formula,
+  values: Record<string, number>,
+): number | null {
+  const a = values[formula.field_a];
+  const b = values[formula.field_b];
   if (a === undefined || b === undefined || isNaN(a) || isNaN(b)) return null;
   switch (formula.operator) {
-    case "*": return a * b;
-    case "+": return a + b;
-    case "-": return a - b;
-    case "/": return b === 0 ? null : a / b;
+    case "*":
+      return a * b;
+    case "+":
+      return a + b;
+    case "-":
+      return a - b;
+    case "/":
+      return b === 0 ? null : a / b;
   }
 }
 
 const OPERATOR_SYMBOLS: Record<FormulaOperator, string> = {
-  "*": "×", "+": "+", "-": "−", "/": "÷",
+  "*": "x",
+  "+": "+",
+  "-": "-",
+  "/": "÷",
 };
 
 const Business: Component = () => {
   const { changeTitle } = Meta.useMeta();
   const params = useParams<IParamData>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [fields, _]  = createResource(() => ({ role: params.role, slug: params.slug || "" }), getFieldsData);
-  const [columns, __] = createResource(() => ({ role: params.role, slug: params.slug || "" }), getColumnsData);
+  const [fields] = createResource(
+    () => ({ role: params.role, slug: params.slug || "" }),
+    getFieldsData,
+  );
+  const [columns] = createResource(
+    () => ({ role: params.role, slug: params.slug || "" }),
+    getColumnsData,
+  );
   const [cards, { refetch: cardRefetch }] = createResource(
-    () => ({ role: params.role, slug: params.slug || "" }), getCardsData
+    () => ({ role: params.role, slug: params.slug || "" }),
+    getCardsData,
   );
 
-  // Formulas stored in localStorage (backend does not support them).
-  // Key format: formulas__{role}__{slug}
-  const loadFormulas = (): Formula[] => {
-    try {
-      const key = `formulas__${params.role}__${params.slug || ""}`;
-      const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as Formula[]) : [];
-    } catch { return []; }
+  const sp = (key: string): string => {
+    const v = searchParams[key];
+    return Array.isArray(v) ? (v[0] ?? "") : (v ?? "");
   };
 
-  const [formulas, setFormulas] = createSignal<Formula[]>(loadFormulas());
+  const filterParams: Accessor<Record<string, string>> = createMemo(() => {
+    const out: Record<string, string> = {};
+    const df = sp("date_from");
+    if (df) out["date_from"] = df;
+    const dt = sp("date_to");
+    if (dt) out["date_to"] = dt;
 
-  // Keep track of computed field values for the preview banner
-  const [computedValues, setComputedValues] = createSignal<Record<string, number | null>>({});
+    (fields() || []).forEach((f) => {
+      if (f.filterable) {
+        const v = sp(`filter_${f.name}`);
+        if (v) out[`filter_${f.name}`] = v;
+      }
+    });
+    return out;
+  });
+
+  const setFilter = (key: string, value: string) => {
+    setSearchParams({ [key]: value || undefined });
+  };
+
+  const resetFilters = () => {
+    const clearing: Record<string, undefined> = {
+      date_from: undefined,
+      date_to: undefined,
+    };
+    (fields() || []).forEach((f) => {
+      if (f.filterable) clearing[`filter_${f.name}`] = undefined;
+    });
+    setSearchParams(clearing);
+  };
+
+  const [formulasResource] = createResource(
+    () => ({ role: params.role, slug: params.slug || "" }),
+    getFormulas,
+  );
+  const [formulas, setFormulas] = createSignal<Formula[]>([]);
+  createEffect(() => {
+    const d = formulasResource();
+    if (d) setFormulas(d);
+  });
+  const [computedValues, setComputedValues] = createSignal<
+    Record<string, number | null>
+  >({});
 
   const [tableKey, setTableKey] = createSignal<number>(0);
   const [showAdd, setShowAdd] = createSignal(false);
@@ -125,25 +183,107 @@ const Business: Component = () => {
 
   let modalForm: HTMLFormElement;
   let modalFieldContainer: HTMLDivElement;
-  let addButton: HTMLButtonElement;
-  let exportExcelButton: HTMLButtonElement;
-  let exportPdfButton: HTMLButtonElement;
-  let printButton: HTMLButtonElement;
-  let filterContainer: HTMLDivElement;
-  let filterResetButton: HTMLButtonElement;
 
-  const formatNumber  = (val: string) => val.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  const [exportingType, setExportingType] = createSignal<
+    "excel" | "pdf" | "print" | null
+  >(null);
+
+  const buildExportUrl = (type: "excel" | "pdf" | "print") => {
+    const base = `/dashboard/${params.role}/${params.slug}/export/${type}`;
+    const fp = filterParams();
+    const qs = new URLSearchParams(
+      Object.entries(fp).filter(([, v]) => v !== ""),
+    ).toString();
+    return qs ? `${base}?${qs}` : base;
+  };
+
+  const handleExport = async (type: "excel" | "pdf" | "print") => {
+    if (exportingType()) return;
+    setExportingType(type);
+    try {
+      if (type === "print") {
+        const res = await api.get<string>(buildExportUrl("print"), {
+          responseType: "text",
+        });
+        const html = res.data as unknown as string;
+        const win = window.open("", "_blank");
+        if (!win) {
+          toastError(
+            "Pop-up diblokir browser. Izinkan pop-up dan coba lagi.",
+            "Error",
+          );
+          return;
+        }
+        win.document.open();
+        win.document.write(html);
+        win.document.close();
+        win.focus();
+
+        setTimeout(() => {
+          win.print();
+        }, 600);
+      } else {
+        const extension = type === "excel" ? ".xlsx" : ".pdf";
+        const res = await api.get(buildExportUrl(type), {
+          responseType: "blob",
+        });
+
+        const disposition =
+          res.headers["content-disposition"] ||
+          res.headers["Content-Disposition"] ||
+          "";
+        const match = /filename[^;=\n]*=(['"]?)(.+?)\1(;|$)/i.exec(
+          disposition,
+        );
+        const slug = params.slug || "data";
+        const filename = match?.[2]?.trim() || `${slug}${extension}`;
+
+        const blob = new Blob([res.data], {
+          type:
+            type === "excel"
+              ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              : "application/pdf",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        success(
+          `File ${type === "excel" ? "Excel" : "PDF"} berhasil diunduh.`,
+          "Berhasil",
+        );
+      }
+    } catch (err: any) {
+      console.error("Export error", err);
+      const msg =
+        err?.response?.data?.message ??
+        `Gagal mengekspor data ke ${type === "excel" ? "Excel" : type === "pdf" ? "PDF" : "cetak"}.`;
+      toastError(msg, "Error");
+    } finally {
+      setExportingType(null);
+    }
+  };
+
+  const formatNumber = (val: string) =>
+    val.replace(/\D/g, "").replace(/\B(?=(\d{3})+(?!\d))/g, ".");
   const unformatNumber = (val: string) => val.replace(/\./g, "");
-  const fullUnformatNumber = (val: string) => val.replace(/\./g, "").split(",")[0];
+  const fullUnformatNumber = (val: string) =>
+    val.replace(/\./g, "").split(",")[0];
 
   const collectNumericValues = (): Record<string, number> => {
     const out: Record<string, number> = {};
     if (!modalFieldContainer) return out;
-    modalFieldContainer.querySelectorAll<HTMLInputElement>("input[data-numeric-field]").forEach((el) => {
-      const name = el.dataset.numericField!;
-      const raw  = parseFloat(unformatNumber(el.value));
-      if (!isNaN(raw)) out[name] = raw;
-    });
+    modalFieldContainer
+      .querySelectorAll<HTMLInputElement>("input[data-numeric-field]")
+      .forEach((el) => {
+        const name = el.dataset.numericField!;
+        const raw = parseFloat(unformatNumber(el.value));
+        if (!isNaN(raw)) out[name] = raw;
+      });
     return out;
   };
 
@@ -151,7 +291,7 @@ const Business: Component = () => {
     const currentFormulas = formulas();
     if (!currentFormulas.length || !modalFieldContainer) return;
 
-    const vals   = collectNumericValues();
+    const vals = collectNumericValues();
     const newComputed: Record<string, number | null> = {};
 
     currentFormulas.forEach((formula) => {
@@ -159,18 +299,17 @@ const Business: Component = () => {
       newComputed[formula.result] = result;
 
       const resultInput = modalFieldContainer.querySelector<HTMLInputElement>(
-        `input[name="${formula.result}"]`
+        `input[name="${formula.result}"]`,
       );
       if (resultInput) {
         resultInput.value = result !== null ? String(result) : "";
-        // Update display in the formatted sibling if present
-        const displayInput = modalFieldContainer.querySelector<HTMLInputElement>(
-          `input[data-computed-display="${formula.result}"]`
-        );
+        const displayInput =
+          modalFieldContainer.querySelector<HTMLInputElement>(
+            `input[data-computed-display="${formula.result}"]`,
+          );
         if (displayInput) {
-          displayInput.value = result !== null
-            ? formatNumber(Math.round(result).toString())
-            : "";
+          displayInput.value =
+            result !== null ? formatNumber(Math.round(result).toString()) : "";
         }
       }
     });
@@ -198,9 +337,9 @@ const Business: Component = () => {
           recalculate();
         });
         el.addEventListener("blur", () => {
-          const raw  = Number(unformatNumber(el.value));
-          const min  = Number(el.dataset.min);
-          const max  = Number(el.dataset.max);
+          const raw = Number(unformatNumber(el.value));
+          const min = Number(el.dataset.min);
+          const max = Number(el.dataset.max);
           if (el.value && raw < min) el.value = formatNumber(String(min));
           if (el.value && raw > max) el.value = formatNumber(String(max));
           recalculate();
@@ -208,7 +347,9 @@ const Business: Component = () => {
       });
 
     modalFieldContainer
-      .querySelectorAll<HTMLInputElement>('input[type="number"][data-numeric-field]')
+      .querySelectorAll<HTMLInputElement>(
+        'input[type="number"][data-numeric-field]',
+      )
       .forEach((el) => {
         el.addEventListener("input", () => recalculate());
         el.addEventListener("change", () => recalculate());
@@ -221,7 +362,10 @@ const Business: Component = () => {
 
   const resultFieldNames = () => new Set(formulas().map((f) => f.result));
 
-  const populateFormFields = (fieldList: IField[], values?: Record<string, any>) => {
+  const populateFormFields = (
+    fieldList: IField[],
+    values?: Record<string, any>,
+  ) => {
     modalFieldContainer.innerHTML = "";
     setComputedValues({});
 
@@ -234,9 +378,11 @@ const Business: Component = () => {
 
     fieldList.forEach((field) => {
       const isComputed = resultNames.has(field.name);
-      const fieldId    = `modal-field-${toSlug(field.name)}`;
+      const fieldId = `modal-field-${toSlug(field.name)}`;
       const isRequired = !isComputed && field.required ? "required" : "";
-      const requiredMark = isRequired ? '<span class="text-red-500 ml-0.5">*</span>' : "";
+      const requiredMark = isRequired
+        ? '<span class="text-red-500 ml-0.5">*</span>'
+        : "";
 
       const isFullWidth = field.type === "textarea" || field.type === "boolean";
       const formWrapper = document.createElement("div");
@@ -244,7 +390,8 @@ const Business: Component = () => {
 
       const formLabel = document.createElement("label");
       formLabel.setAttribute("for", fieldId);
-      formLabel.className = "block text-gray-500 text-[11px] font-semibold mb-1 uppercase tracking-wide";
+      formLabel.className =
+        "block text-gray-500 text-[11px] font-semibold mb-1 uppercase tracking-wide";
 
       if (isComputed) {
         formLabel.innerHTML =
@@ -262,9 +409,10 @@ const Business: Component = () => {
 
       if (isComputed) {
         const hiddenInput = document.createElement("input");
-        hiddenInput.type  = "hidden";
-        hiddenInput.name  = field.name;
-        hiddenInput.value = values?.[field.name] !== undefined ? String(values[field.name]) : "";
+        hiddenInput.type = "hidden";
+        hiddenInput.name = field.name;
+        hiddenInput.value =
+          values?.[field.name] !== undefined ? String(values[field.name]) : "";
         formWrapper.appendChild(hiddenInput);
 
         const displayWrapper = document.createElement("div");
@@ -278,7 +426,7 @@ const Business: Component = () => {
 
         const displayInput = document.createElement("input");
         displayInput.type = "text";
-        displayInput.id   = fieldId;
+        displayInput.id = fieldId;
         displayInput.dataset.computedDisplay = field.name;
         displayInput.readOnly = true;
         displayInput.placeholder = "Dihitung otomatis…";
@@ -287,7 +435,9 @@ const Business: Component = () => {
           "bg-violet-50 text-violet-700 font-semibold cursor-not-allowed " +
           "placeholder-violet-300 focus:outline-none";
         if (values?.[field.name] !== undefined) {
-          displayInput.value = formatNumber(Math.round(Number(values[field.name])).toString());
+          displayInput.value = formatNumber(
+            Math.round(Number(values[field.name])).toString(),
+          );
         }
         displayWrapper.appendChild(displayInput);
         formWrapper.appendChild(displayWrapper);
@@ -297,12 +447,15 @@ const Business: Component = () => {
 
         const srcFormula = currentFormulas.find((f) => f.result === field.name);
         if (srcFormula) {
-          const aLabel = fieldList.find((f) => f.name === srcFormula.fieldA)?.label ?? srcFormula.fieldA;
-          const bLabel = fieldList.find((f) => f.name === srcFormula.fieldB)?.label ?? srcFormula.fieldB;
+          const aLabel =
+            fieldList.find((f) => f.name === srcFormula.field_a)?.label ??
+            srcFormula.field_a;
+          const bLabel =
+            fieldList.find((f) => f.name === srcFormula.field_b)?.label ??
+            srcFormula.field_b;
           hint.textContent = `${aLabel} ${OPERATOR_SYMBOLS[srcFormula.operator]} ${bLabel}`;
         }
         formWrapper.appendChild(hint);
-
       } else {
         switch (field.type) {
           case "text":
@@ -343,7 +496,7 @@ const Business: Component = () => {
 
           case "select": {
             const opts: IFieldOption[] = (field.options || []).map((o: any) =>
-              typeof o === "object" ? o : { value: o, label: String(o) }
+              typeof o === "object" ? o : { value: o, label: String(o) },
             );
             const options = opts
               .map((o) => `<option value="${o.value}">${o.label}</option>`)
@@ -388,14 +541,16 @@ const Business: Component = () => {
 
       if (values && values[field.name] !== undefined && !isComputed) {
         const el = modalFieldContainer.querySelector(
-          `[name="${field.name}"]`
+          `[name="${field.name}"]`,
         ) as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null;
         if (el) {
           if ((el as HTMLInputElement).type === "checkbox") {
             (el as HTMLInputElement).checked = !!values[field.name];
           } else {
             if (field.type === "number" || field.type === "currency") {
-              (el as HTMLInputElement).value = fullUnformatNumber(String(values[field.name] ?? ""));
+              (el as HTMLInputElement).value = fullUnformatNumber(
+                String(values[field.name] ?? ""),
+              );
             } else {
               (el as HTMLInputElement).value = values[field.name] ?? "";
             }
@@ -409,31 +564,28 @@ const Business: Component = () => {
     recalculate();
   };
 
-  onMount(() => {
-    if (addButton) {
-      addButton.addEventListener("click", () => {
-        setModalTitleText("Tambah Data");
-        setSelectedRow(null);
-        setShowAdd(true);
-      });
-    }
-    onCleanup(() => {
-      if (addButton) addButton.removeEventListener("click", () => {});
-    });
-  });
+  // (add/edit modals are opened via inline onClick — no imperative listeners needed)
 
   const clearFormErrors = () => {
-    modalFieldContainer.querySelectorAll<HTMLElement>(".field-error").forEach((el) => { el.textContent = ""; });
-    modalFieldContainer.querySelectorAll<HTMLInputElement>("input,select,textarea").forEach((el) =>
-      el.classList.remove("border-red-500")
-    );
+    modalFieldContainer
+      .querySelectorAll<HTMLElement>(".field-error")
+      .forEach((el) => {
+        el.textContent = "";
+      });
+    modalFieldContainer
+      .querySelectorAll<HTMLInputElement>("input,select,textarea")
+      .forEach((el) => el.classList.remove("border-red-500"));
   };
 
   const showFieldError = (name: string, messages: string[]) => {
-    const container = modalFieldContainer.querySelector<HTMLElement>(`.field-error[data-field="${name}"]`);
+    const container = modalFieldContainer.querySelector<HTMLElement>(
+      `.field-error[data-field="${name}"]`,
+    );
     if (container) {
       container.innerHTML = messages.map((m) => `<div>${m}</div>`).join("");
-      const el = modalFieldContainer.querySelector<HTMLElement>(`[name="${name}"]`);
+      const el = modalFieldContainer.querySelector<HTMLElement>(
+        `[name="${name}"]`,
+      );
       if (el) el.classList.add("border-red-500");
     }
   };
@@ -444,7 +596,9 @@ const Business: Component = () => {
 
     modalFieldContainer
       .querySelectorAll<HTMLInputElement>('input[data-type="number"]')
-      .forEach((el) => { el.value = unformatNumber(el.value); });
+      .forEach((el) => {
+        el.value = unformatNumber(el.value);
+      });
 
     recalculate();
 
@@ -455,18 +609,25 @@ const Business: Component = () => {
       const currentFields = fields() || [];
 
       formData.forEach((value, key) => {
-        const el       = modalForm.querySelector(`[name="${key}"]`) as HTMLInputElement | null;
+        const el = modalForm.querySelector(
+          `[name="${key}"]`,
+        ) as HTMLInputElement | null;
         const fieldDef = currentFields.find((f) => f.name === key);
-        const isComp   = resultFieldNames().has(key);
+        const isComp = resultFieldNames().has(key);
 
-        if (el?.type === "checkbox") { payload[key] = (el as HTMLInputElement).checked; return; }
+        if (el?.type === "checkbox") {
+          payload[key] = (el as HTMLInputElement).checked;
+          return;
+        }
         if (isComp) {
           const n = parseFloat(String(value ?? ""));
           payload[key] = isNaN(n) ? null : n;
           return;
         }
         if (fieldDef?.type === "number" || fieldDef?.type === "currency") {
-          let v = String(value ?? "").replace(/\./g, "").replace(/,/g, ".");
+          let v = String(value ?? "")
+            .replace(/\./g, "")
+            .replace(/,/g, ".");
           payload[key] = v === "" ? null : Number(v);
           return;
         }
@@ -476,18 +637,26 @@ const Business: Component = () => {
       const endpointBase = `/dashboard/${params.role}/${params.slug}`;
 
       if (showEdit()) {
-        const id       = selectedRow()?.id;
+        const id = selectedRow()?.id;
         const response = await api.put(`${endpointBase}/${id}`, payload);
         if (response.status === 200) {
-          setShowEdit(false); cardRefetch?.(); setTableKey((k) => k + 1);
+          setShowEdit(false);
+          cardRefetch?.();
+          setTableKey((k) => k + 1);
           success("Data berhasil diperbarui.", "Berhasil");
-        } else { toastError("Gagal memperbarui data.", "Error"); }
+        } else {
+          toastError("Gagal memperbarui data.", "Error");
+        }
       } else {
         const response = await api.post(endpointBase, payload);
         if (response.status === 200 || response.status === 201) {
-          setShowAdd(false); cardRefetch?.(); setTableKey((k) => k + 1);
+          setShowAdd(false);
+          cardRefetch?.();
+          setTableKey((k) => k + 1);
           success("Data berhasil disimpan.", "Berhasil");
-        } else { toastError("Gagal menyimpan data.", "Error"); }
+        } else {
+          toastError("Gagal menyimpan data.", "Error");
+        }
       }
     } catch (err: any) {
       console.error("Submit error", err);
@@ -496,8 +665,13 @@ const Business: Component = () => {
         Object.entries(data.errors).forEach(([field, msgs]) => {
           showFieldError(field, Array.isArray(msgs) ? msgs : [String(msgs)]);
         });
-        const firstEl = modalFieldContainer.querySelector(`[name="${Object.keys(data.errors)[0]}"]`);
-        (firstEl as any)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        const firstEl = modalFieldContainer.querySelector(
+          `[name="${Object.keys(data.errors)[0]}"]`,
+        );
+        (firstEl as any)?.scrollIntoView?.({
+          behavior: "smooth",
+          block: "center",
+        });
       } else {
         toastError("Terjadi kesalahan saat menyimpan data.", "Error");
       }
@@ -506,33 +680,50 @@ const Business: Component = () => {
     }
   };
 
-  const handleOpenEdit   = (row: any) => { setSelectedRow(row);  setModalTitleText("Edit Data"); setShowEdit(true); };
-  const handleOpenDelete = (row: any) => { setSelectedRow(row);  setShowConfirmDelete(true); };
+  const handleOpenEdit = (row: any) => {
+    setSelectedRow(row);
+    setModalTitleText("Edit Data");
+    setShowEdit(true);
+  };
+  const handleOpenDelete = (row: any) => {
+    setSelectedRow(row);
+    setShowConfirmDelete(true);
+  };
 
   const handleConfirmDelete = async () => {
     setConfirmLoading(true);
     try {
-      const resp = await api.delete(`/dashboard/${params.role}/${params.slug}/${selectedRow()?.id}`);
+      const resp = await api.delete(
+        `/dashboard/${params.role}/${params.slug}/${selectedRow()?.id}`,
+      );
       if (resp.status === 200 || resp.status === 204) {
-        setShowConfirmDelete(false); cardRefetch?.(); setTableKey((k) => k + 1);
+        setShowConfirmDelete(false);
+        cardRefetch?.();
+        setTableKey((k) => k + 1);
         success("Data berhasil dihapus.", "Berhasil");
-      } else { toastError("Gagal menghapus data.", "Error"); }
-    } catch { toastError("Terjadi kesalahan saat menghapus data.", "Error"); }
-    finally { setConfirmLoading(false); }
+      } else {
+        toastError("Gagal menghapus data.", "Error");
+      }
+    } catch {
+      toastError("Terjadi kesalahan saat menghapus data.", "Error");
+    } finally {
+      setConfirmLoading(false);
+    }
   };
 
   createEffect(() => {
-    changeTitle(`${ucFirst(params.role)}${params.slug ? ` - ${ucWords(params.slug)}` : ""}`);
+    changeTitle(
+      `${ucFirst(params.role)}${params.slug ? ` - ${ucWords(params.slug)}` : ""}`,
+    );
   });
 
-  createEffect(() => {
-    const _dep = params.slug; 
-    setFormulas(loadFormulas());
-  });
 
   createEffect(() => {
     if ((showAdd() || showEdit()) && modalFieldContainer) {
-      populateFormFields(fields() || [], showEdit() ? selectedRow() ?? undefined : undefined);
+      populateFormFields(
+        fields() || [],
+        showEdit() ? (selectedRow() ?? undefined) : undefined,
+      );
       clearFormErrors();
     }
   });
@@ -542,8 +733,15 @@ const Business: Component = () => {
   return (
     <>
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4 mb-4 md:mb-6">
-        <Show when={cards() && cards.state === "ready"}
-          fallback={<For each={[1,2,3,4,5]}>{() => <div class="animate-pulse bg-gray-200 rounded-xl h-20 md:h-24 shadow" />}</For>}
+        <Show
+          when={cards() && cards.state === "ready"}
+          fallback={
+            <For each={[1, 2, 3, 4, 5]}>
+              {() => (
+                <div class="animate-pulse bg-gray-200 rounded-xl h-20 md:h-24 shadow" />
+              )}
+            </For>
+          }
         >
           <For each={cards()}>
             {(card) => {
@@ -552,13 +750,24 @@ const Business: Component = () => {
                 <div class="bg-white rounded-xl p-3 md:p-4 shadow card-hover">
                   <div class="flex items-center justify-between gap-2">
                     <div class="flex-1 min-w-0">
-                      <p class="text-gray-500 text-[10px] md:text-xs font-medium mb-0.5 leading-tight line-clamp-2">{card.title}</p>
-                      <p class={`text-sm md:text-base lg:text-lg font-bold text-${metaData.color}-600 truncate`}>
-                        {card.is_currency ? formatCurrency(card.value) + ",00" : card.value}
+                      <p class="text-gray-500 text-[10px] md:text-xs font-medium mb-0.5 leading-tight line-clamp-2">
+                        {card.title}
+                      </p>
+                      <p
+                        class={`text-sm md:text-base lg:text-lg font-bold text-${metaData.color}-600 truncate`}
+                      >
+                        {card.is_currency
+                          ? formatCurrency(card.value) + ",00"
+                          : card.value}
                       </p>
                     </div>
-                    <div class={`w-9 h-9 md:w-10 md:h-10 bg-${metaData.color}-100 rounded-full flex items-center justify-center flex-shrink-0`}>
-                      <Fa icon={metaData.icon} class={`text-${metaData.color}-600 text-sm`} />
+                    <div
+                      class={`w-9 h-9 md:w-10 md:h-10 bg-${metaData.color}-100 rounded-full flex items-center justify-center flex-shrink-0`}
+                    >
+                      <Fa
+                        icon={metaData.icon}
+                        class={`text-${metaData.color}-600 text-sm`}
+                      />
                     </div>
                   </div>
                 </div>
@@ -570,84 +779,163 @@ const Business: Component = () => {
 
       <div class="bg-white rounded-xl p-3 md:p-5 shadow mb-4 md:mb-6">
         <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-4">
-          <h2 class="text-sm md:text-base font-bold text-gray-800 whitespace-nowrap">Filter dan Aksi Data</h2>
+          <h2 class="text-sm md:text-base font-bold text-gray-800 whitespace-nowrap">
+            Filter dan Aksi Data
+          </h2>
           <div class="flex flex-wrap gap-1.5">
-            <For each={buttons}>
-              {(button) => (
-                <button
-                  ref={(el) => {
-                    if (button.id === "add-data")     addButton = el;
-                    else if (button.id === "export-excel") exportExcelButton = el;
-                    else if (button.id === "export-pdf")   exportPdfButton = el;
-                    else if (button.id === "print-table")  printButton = el;
-                  }}
-                  class="inline-flex items-center gap-1.5 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
-                  classList={{
-                    "bg-blue-600 hover:bg-blue-700":   button.color === "blue",
-                    "bg-green-600 hover:bg-green-700": button.color === "green",
-                    "bg-red-600 hover:bg-red-700":     button.color === "red",
-                    "bg-gray-600 hover:bg-gray-700":   button.color === "gray",
-                  }}
-                >
-                  <Fa icon={button.icon} />
-                  <span class="hidden sm:inline">{button.text}</span>
-                  <span class="sm:hidden">{button.mobileText}</span>
-                </button>
-              )}
-            </For>
+            {/* Add Data */}
             <button
-              ref={(el) => (filterResetButton = el)}
-              class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg hover:bg-gray-200 transition-colors text-xs md:text-sm font-medium cursor-pointer"
+              onClick={() => {
+                setModalTitleText("Tambah Data");
+                setSelectedRow(null);
+                setShowAdd(true);
+              }}
+              class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
             >
-              <Fa icon={faRefresh} /><span>Reset</span>
+              <Fa icon={faPlus} />
+              <span class="hidden sm:inline">Tambah Data</span>
+              <span class="sm:hidden">Tambah</span>
+            </button>
+
+            {/* Export Excel */}
+            <button
+              onClick={() => handleExport("excel")}
+              disabled={!!exportingType()}
+              class="inline-flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Show
+                when={exportingType() === "excel"}
+                fallback={<Fa icon={faFileExcel} />}
+              >
+                <Fa icon={faSpinner} class="animate-spin" />
+              </Show>
+              <span class="hidden sm:inline">Export Excel</span>
+              <span class="sm:hidden">Excel</span>
+            </button>
+
+            {/* Export PDF */}
+            <button
+              onClick={() => handleExport("pdf")}
+              disabled={!!exportingType()}
+              class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Show
+                when={exportingType() === "pdf"}
+                fallback={<Fa icon={faFilePdf} />}
+              >
+                <Fa icon={faSpinner} class="animate-spin" />
+              </Show>
+              <span class="hidden sm:inline">Export PDF</span>
+              <span class="sm:hidden">PDF</span>
+            </button>
+
+            {/* Print */}
+            <button
+              onClick={() => handleExport("print")}
+              disabled={!!exportingType()}
+              class="inline-flex items-center gap-1.5 bg-gray-600 hover:bg-gray-700 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <Show
+                when={exportingType() === "print"}
+                fallback={<Fa icon={faPrint} />}
+              >
+                <Fa icon={faSpinner} class="animate-spin" />
+              </Show>
+              <span class="hidden sm:inline">Cetak Tabel</span>
+              <span class="sm:hidden">Cetak</span>
+            </button>
+            <button
+              class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg hover:bg-gray-200 transition-colors text-xs md:text-sm font-medium cursor-pointer"
+              onClick={resetFilters}
+            >
+              <Fa icon={faRefresh} />
+              <span>Reset</span>
             </button>
           </div>
         </div>
 
-        <div ref={(el) => (filterContainer = el)}
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-3"
-        >
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2 md:gap-3">
           <div>
             <label class="flex items-center gap-1 text-gray-600 text-xs font-semibold mb-1 uppercase tracking-wide">
               <Fa icon={faCalendarAlt} class="text-gray-400" /> Dari Tanggal
             </label>
-            <input type="date" id="filter-date-from"
-              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors" />
+            <input
+              type="date"
+              value={sp("date_from")}
+              onInput={(e) => setFilter("date_from", e.currentTarget.value)}
+              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            />
           </div>
           <div>
             <label class="flex items-center gap-1 text-gray-600 text-xs font-semibold mb-1 uppercase tracking-wide">
               <Fa icon={faCalendarCheck} class="text-gray-400" /> Sampai Tanggal
             </label>
-            <input type="date" id="filter-date-to"
-              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors" />
+            <input
+              type="date"
+              value={sp("date_to")}
+              onInput={(e) => setFilter("date_to", e.currentTarget.value)}
+              class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+            />
           </div>
-          <Show when={fields() && fields.state === "ready"}
-            fallback={<For each={[1,2]}>{() => (
-              <div><div class="bg-gray-200 rounded h-4 w-20 mb-1 animate-pulse" />
-              <div class="w-full bg-gray-200 rounded-lg h-8 animate-pulse" /></div>
-            )}</For>}
+          <Show
+            when={fields() && fields.state === "ready"}
+            fallback={
+              <For each={[1, 2]}>
+                {() => (
+                  <div>
+                    <div class="bg-gray-200 rounded h-4 w-20 mb-1 animate-pulse" />
+                    <div class="w-full bg-gray-200 rounded-lg h-8 animate-pulse" />
+                  </div>
+                )}
+              </For>
+            }
           >
             <For each={fields()}>
-              {(field) => field.filterable ? (
-                <div>
-                  <label class="flex items-center gap-1 text-gray-600 text-xs font-semibold mb-1 uppercase tracking-wide">
-                    <Fa icon={faFilter} class="text-gray-400" /> {field.label}
-                  </label>
-                  <Switch>
-                    <Match when={field.type === "select"}>
-                      <select id={`filter-${field.name}`}
-                        class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors">
-                        <option value="">Semua {field.label}</option>
-                        <For each={field.options}>{(option) => <option value={option.value}>{ucWords(option.label)}</option>}</For>
-                      </select>
-                    </Match>
-                    <Match when={field.type === "date"}>
-                      <input type="date" id={`filter-${field.name}`}
-                        class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors" />
-                    </Match>
-                  </Switch>
-                </div>
-              ) : null}
+              {(field) =>
+                field.filterable ? (
+                  <div>
+                    <label class="flex items-center gap-1 text-gray-600 text-xs font-semibold mb-1 uppercase tracking-wide">
+                      <Fa icon={faFilter} class="text-gray-400" /> {field.label}
+                    </label>
+                    <Switch>
+                      <Match when={field.type === "select"}>
+                        <select
+                          value={sp(`filter_${field.name}`)}
+                          onInput={(e) =>
+                            setFilter(
+                              `filter_${field.name}`,
+                              e.currentTarget.value,
+                            )
+                          }
+                          class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        >
+                          <option value="">Semua {field.label}</option>
+                          <For each={field.options}>
+                            {(option) => (
+                              <option value={option.value}>
+                                {ucWords(option.label)}
+                              </option>
+                            )}
+                          </For>
+                        </select>
+                      </Match>
+                      <Match when={field.type === "date"}>
+                        <input
+                          type="date"
+                          value={sp(`filter_${field.name}`)}
+                          onInput={(e) =>
+                            setFilter(
+                              `filter_${field.name}`,
+                              e.currentTarget.value,
+                            )
+                          }
+                          class="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                        />
+                      </Match>
+                    </Switch>
+                  </div>
+                ) : null
+              }
             </For>
           </Show>
         </div>
@@ -660,7 +948,13 @@ const Business: Component = () => {
             columns={columns}
             endpoint={`/dashboard/${params.role}/${params.slug}`}
             refreshTrigger={tableKey()}
-            action={{ enableEdit: true, enableDelete: true, onEdit: handleOpenEdit, onDelete: handleOpenDelete }}
+            extraParams={filterParams}
+            action={{
+              enableEdit: true,
+              enableDelete: true,
+              onEdit: handleOpenEdit,
+              onDelete: handleOpenDelete,
+            }}
           />
         </div>
       </div>
@@ -668,42 +962,68 @@ const Business: Component = () => {
       <Show when={showAdd() || showEdit()}>
         <div
           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowAdd(false); setShowEdit(false); } }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAdd(false);
+              setShowEdit(false);
+            }
+          }}
         >
           <div class="relative w-full max-w-md bg-white rounded-xl shadow-2xl flex flex-col max-h-[85vh]">
-
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-              <h3 class="text-sm font-semibold text-gray-800">{modalTitleText()}</h3>
+              <h3 class="text-sm font-semibold text-gray-800">
+                {modalTitleText()}
+              </h3>
               <button
                 type="button"
                 class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                onClick={() => { setShowAdd(false); setShowEdit(false); }}
+                onClick={() => {
+                  setShowAdd(false);
+                  setShowEdit(false);
+                }}
               >
                 <Fa icon={faTimes} class="text-xs" />
               </button>
             </div>
 
-            <Show when={hasComputedFields() && Object.keys(computedValues()).length > 0}>
+            <Show
+              when={
+                hasComputedFields() && Object.keys(computedValues()).length > 0
+              }
+            >
               <div class="px-4 py-2.5 bg-violet-50 border-b border-violet-100">
                 <div class="flex items-start gap-2">
                   <div class="w-5 h-5 bg-violet-100 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Fa icon={faCalculator} class="text-violet-500 text-[9px]" />
+                    <Fa
+                      icon={faCalculator}
+                      class="text-violet-500 text-[9px]"
+                    />
                   </div>
                   <div class="flex-1 min-w-0">
-                    <p class="text-[10px] font-bold text-violet-600 uppercase tracking-wide mb-1">Kalkulasi Otomatis</p>
+                    <p class="text-[10px] font-bold text-violet-600 uppercase tracking-wide mb-1">
+                      Kalkulasi Otomatis
+                    </p>
                     <div class="flex flex-wrap gap-2">
                       <For each={formulas()}>
                         {(formula) => {
-                          const resultField = () => (fields() || []).find((f) => f.name === formula.result);
+                          const resultField = () =>
+                            (fields() || []).find(
+                              (f) => f.name === formula.result,
+                            );
                           const val = () => computedValues()[formula.result];
                           return (
                             <div class="flex items-center gap-1 bg-white rounded-lg px-2 py-1 border border-violet-100 shadow-sm">
-                              <span class="text-[10px] text-gray-500">{resultField()?.label ?? formula.result}:</span>
+                              <span class="text-[10px] text-gray-500">
+                                {resultField()?.label ?? formula.result}:
+                              </span>
                               <span class="text-[11px] font-bold text-violet-700">
                                 {val() !== null && val() !== undefined
-                                  ? (resultField()?.type === "currency"
-                                    ? "Rp " + formatNumber(Math.round(val()!).toString())
-                                    : String(val()))
+                                  ? resultField()?.type === "currency"
+                                    ? "Rp " +
+                                      formatNumber(
+                                        Math.round(val()!).toString(),
+                                      )
+                                    : String(val())
                                   : "—"}
                               </span>
                             </div>
@@ -716,7 +1036,11 @@ const Business: Component = () => {
               </div>
             </Show>
 
-            <form ref={(el) => (modalForm = el)} onSubmit={handleFormSubmit} class="flex flex-col flex-1 min-h-0">
+            <form
+              ref={(el) => (modalForm = el)}
+              onSubmit={handleFormSubmit}
+              class="flex flex-col flex-1 min-h-0"
+            >
               <div class="overflow-y-auto flex-1 px-4 py-3">
                 <div ref={(el) => (modalFieldContainer = el)} />
               </div>
@@ -725,7 +1049,10 @@ const Business: Component = () => {
                 <button
                   type="button"
                   class="flex-1 inline-flex items-center justify-center gap-1.5 bg-gray-100 text-gray-700 py-2 rounded-lg hover:bg-gray-200 transition-colors font-medium text-sm cursor-pointer"
-                  onClick={() => { setShowAdd(false); setShowEdit(false); }}
+                  onClick={() => {
+                    setShowAdd(false);
+                    setShowEdit(false);
+                  }}
                 >
                   <Fa icon={faTimes} class="text-xs" /> Batal
                 </button>
@@ -734,9 +1061,16 @@ const Business: Component = () => {
                   disabled={isSubmitting()}
                   class="flex-1 inline-flex items-center justify-center gap-1.5 bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-medium text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {isSubmitting()
-                    ? <><Fa icon={faSpinner} class="animate-spin text-xs" /> Menyimpan...</>
-                    : <><Fa icon={faSave} class="text-xs" /> Simpan</>}
+                  {isSubmitting() ? (
+                    <>
+                      <Fa icon={faSpinner} class="animate-spin text-xs" />{" "}
+                      Menyimpan...
+                    </>
+                  ) : (
+                    <>
+                      <Fa icon={faSave} class="text-xs" /> Simpan
+                    </>
+                  )}
                 </button>
               </div>
             </form>
@@ -747,7 +1081,9 @@ const Business: Component = () => {
       <Show when={showConfirmDelete()}>
         <div
           class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowConfirmDelete(false); }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowConfirmDelete(false);
+          }}
         >
           <div class="w-full max-w-xs bg-white rounded-xl shadow-2xl overflow-hidden">
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -763,7 +1099,10 @@ const Business: Component = () => {
             <div class="px-4 py-3">
               <p class="text-sm text-gray-600 leading-snug">
                 Yakin ingin menghapus data ini? Tindakan ini{" "}
-                <span class="font-medium text-red-500">tidak dapat dibatalkan</span>.
+                <span class="font-medium text-red-500">
+                  tidak dapat dibatalkan
+                </span>
+                .
               </p>
             </div>
             <div class="flex gap-2 px-4 py-3 border-t border-gray-100">
@@ -780,7 +1119,9 @@ const Business: Component = () => {
                 class="flex-1 inline-flex items-center justify-center gap-1.5 bg-red-500 text-white py-2 rounded-lg hover:bg-red-600 transition-colors font-medium text-sm cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 onClick={handleConfirmDelete}
               >
-                {confirmLoading() ? <Fa icon={faSpinner} class="animate-spin text-xs" /> : null}
+                {confirmLoading() ? (
+                  <Fa icon={faSpinner} class="animate-spin text-xs" />
+                ) : null}
                 Hapus
               </button>
             </div>

@@ -67,7 +67,7 @@ const Login: Component = () => {
       println(
         "Login",
         "Password harus terdiri dari minimal 8 karakter",
-        EDebugType.WARN
+        EDebugType.WARN,
       );
       isValid = false;
     }
@@ -118,7 +118,7 @@ const Login: Component = () => {
           println(
             "Login",
             "Satu atau lebih input tidak valid.",
-            EDebugType.ERROR
+            EDebugType.ERROR,
           );
           toastError("Satu atau lebih input tidak valid.", "Error");
           setErrors(responseData.errors);
@@ -127,7 +127,7 @@ const Login: Component = () => {
           println(
             "Login",
             "Email atau kata sandi salah. Silakan coba lagi.",
-            EDebugType.ERROR
+            EDebugType.ERROR,
           );
           toastError("Email atau kata sandi salah.", "Error");
           setErrors(responseData.errors);
@@ -135,7 +135,7 @@ const Login: Component = () => {
           println(
             "Login",
             "Seperti ada yang tidak beres. Jika masalah berlanjut, silakan hubungi administrator.",
-            EDebugType.ERROR
+            EDebugType.ERROR,
           );
           toastError("Terjadi kesalahan saat login.", "Error");
         }

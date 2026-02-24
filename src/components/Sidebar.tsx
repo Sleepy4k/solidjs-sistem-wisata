@@ -3,7 +3,14 @@ import { getSidebarItems } from "@services";
 import { A } from "@solidjs/router";
 import { firstChar, toSlug } from "@utils";
 import Fa from "solid-fa";
-import { createEffect, createResource, For, onCleanup, onMount, Show } from "solid-js";
+import {
+  createEffect,
+  createResource,
+  For,
+  onCleanup,
+  onMount,
+  Show,
+} from "solid-js";
 import LogoTelkom from "@assets/images/telkom.png";
 import { Auth, Meta } from "@contexts";
 
@@ -30,7 +37,10 @@ interface ISidebarProp {
   isLoading?: boolean;
 }
 
-interface IconItem { name: string; icon: solidIcons.IconDefinition; }
+interface IconItem {
+  name: string;
+  icon: solidIcons.IconDefinition;
+}
 
 const iconCatalog: IconItem[] = Object.entries(solidIcons)
   .filter(([k]) => k.startsWith("fa") && k !== "fas" && k !== "prefix")
@@ -74,10 +84,7 @@ export default function Sidebar(props: ISidebarProp) {
   };
 
   const getMenuRole = (sidebar: IMenuItem): string => {
-    return (
-      sidebar.meta?.route?.split("/")[4] ||
-      toSlug(sidebar.name)
-    );
+    return sidebar.meta?.route?.split("/")[4] || toSlug(sidebar.name);
   };
 
   const handleOverlayClick = (overlay: HTMLDivElement) => {
@@ -92,7 +99,7 @@ export default function Sidebar(props: ISidebarProp) {
 
   onMount(() => {
     const overlay = document.getElementById(
-      "sidebar-overlay"
+      "sidebar-overlay",
     ) as HTMLDivElement;
 
     if (overlay) {
@@ -115,7 +122,11 @@ export default function Sidebar(props: ISidebarProp) {
         <div class="p-6 border-b border-gray-200 flex-shrink-0">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg">
-              <img src={LogoTelkom} alt="Logo" class="w-10 h-10 object-contain" />
+              <img
+                src={LogoTelkom}
+                alt="Logo"
+                class="w-10 h-10 object-contain"
+              />
             </div>
             <div>
               <h1 class="text-lg font-bold text-gray-900">Admin Panel</h1>
@@ -141,6 +152,18 @@ export default function Sidebar(props: ISidebarProp) {
               <Fa icon={solidIcons.faChartLine} class="w-5 h-5" />
               <span>Dashboard</span>
             </A>
+
+            <Show when={props.userRole === "admin"}>
+              <A
+                href="/admin/users"
+                class="flex items-center gap-3 px-4 py-3 rounded-xl text-blue-700 hover:bg-blue-100 transition-all duration-200 group cursor-pointer"
+                inactiveClass="text-gray-700 hover:bg-gray-100 hover:text-blue-700"
+                activeClass="bg-blue-600 text-white shadow-lg hover:text-blue-700"
+              >
+                <Fa icon={solidIcons.faUsers} class="w-5 h-5" />
+                <span>Manajemen User</span>
+              </A>
+            </Show>
 
             <Show
               when={sidebarData()}
@@ -199,9 +222,21 @@ export default function Sidebar(props: ISidebarProp) {
                       >
                         <Show
                           when={item.is_datatable}
-                          fallback={<Fa icon={solidIcons.faPlusCircle} class="w-5 h-5" />}
+                          fallback={
+                            <Fa
+                              icon={solidIcons.faPlusCircle}
+                              class="w-5 h-5"
+                            />
+                          }
                         >
-                          <Fa icon={generateIcon(item.meta?.icon) as solidIcons.IconDefinition} class="w-5 h-5" />
+                          <Fa
+                            icon={
+                              generateIcon(
+                                item.meta?.icon,
+                              ) as solidIcons.IconDefinition
+                            }
+                            class="w-5 h-5"
+                          />
                         </Show>
                         <span>{item.name}</span>
                       </A>

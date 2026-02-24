@@ -1,99 +1,175 @@
-import { For, onCleanup, onMount, Show, createSignal } from "solid-js";
-import { getToasts, removeToast, IToast, pauseToast, resumeToast } from "../utils/toast";
+import { createSignal, For, onMount, Show } from "solid-js";
+import {
+  getToasts,
+  removeToast,
+  IToast,
+  pauseToast,
+  resumeToast,
+} from "../utils/toast";
 import Fa from "solid-fa";
 import {
   faCheckCircle,
-  faTimes,
+  faExclamationCircle,
   faInfoCircle,
   faBug,
+  faTimes,
 } from "@fortawesome/free-solid-svg-icons";
 
-const variantColor = (type: IToast["type"]) => {
+const variantTokens = (type: IToast["type"]) => {
   switch (type) {
     case "success":
-      return "bg-green-50 border-green-200 text-green-800";
+      return {
+        bar: "bg-emerald-500",
+        icon: "text-emerald-500",
+        bg: "bg-white",
+        border: "border-emerald-200",
+        accent: "border-l-emerald-500",
+        title: "text-gray-900",
+        msg: "text-gray-600",
+        close: "text-gray-400 hover:text-emerald-600 hover:bg-emerald-50",
+        fa: faCheckCircle,
+      };
     case "error":
-      return "bg-red-50 border-red-200 text-red-800";
+      return {
+        bar: "bg-red-500",
+        icon: "text-red-500",
+        bg: "bg-white",
+        border: "border-red-200",
+        accent: "border-l-red-500",
+        title: "text-gray-900",
+        msg: "text-gray-600",
+        close: "text-gray-400 hover:text-red-600 hover:bg-red-50",
+        fa: faExclamationCircle,
+      };
     case "info":
-      return "bg-blue-50 border-blue-200 text-blue-800";
+      return {
+        bar: "bg-blue-500",
+        icon: "text-blue-500",
+        bg: "bg-white",
+        border: "border-blue-200",
+        accent: "border-l-blue-500",
+        title: "text-gray-900",
+        msg: "text-gray-600",
+        close: "text-gray-400 hover:text-blue-600 hover:bg-blue-50",
+        fa: faInfoCircle,
+      };
     case "debug":
-      return "bg-gray-50 border-gray-200 text-gray-800";
     default:
-      return "bg-gray-50 border-gray-200 text-gray-800";
+      return {
+        bar: "bg-gray-400",
+        icon: "text-gray-500",
+        bg: "bg-white",
+        border: "border-gray-200",
+        accent: "border-l-gray-400",
+        title: "text-gray-900",
+        msg: "text-gray-600",
+        close: "text-gray-400 hover:text-gray-700 hover:bg-gray-100",
+        fa: faBug,
+      };
   }
 };
 
-function IconFor(type: IToast["type"]) {
-  switch (type) {
-    case "success":
-      return faCheckCircle;
-    case "error":
-      return faTimes;
-    case "info":
-      return faInfoCircle;
-    case "debug":
-      return faBug;
-    default:
-      return faInfoCircle;
-  }
-}
-
 function ToastItem(props: { toast: IToast }) {
   const [mounted, setMounted] = createSignal(false);
+  const tk = variantTokens(props.toast.type);
+
   onMount(() => {
     requestAnimationFrame(() => setMounted(true));
   });
 
   return (
     <div
-      class={
-        "border shadow-sm rounded-lg p-3 flex items-start gap-3 transform transition-all duration-300 " +
-        variantColor(props.toast.type)
-      }
+      class={[
+        "relative flex items-start gap-3 rounded-xl shadow-lg border border-l-4 px-4 py-3.5",
+        "w-full max-w-sm transition-all duration-300 ease-out select-none",
+        tk.bg,
+        tk.border,
+        tk.accent,
+      ].join(" ")}
       classList={{
-        "opacity-0 -translate-y-2 scale-95": !!props.toast.closing || !mounted(),
-        "opacity-100 translate-y-0 scale-100": mounted() && !props.toast.closing,
+        "opacity-0 translate-x-6 scale-95 pointer-events-none":
+          !!props.toast.closing || !mounted(),
+        "opacity-100 translate-x-0 scale-100":
+          mounted() && !props.toast.closing,
       }}
       onMouseEnter={() => pauseToast(props.toast.id)}
       onMouseLeave={() => resumeToast(props.toast.id)}
+      role="alert"
+      aria-live="assertive"
     >
-      <div class="pt-0.5 w-6 text-center">
-        <Fa icon={IconFor(props.toast.type)} />
-      </div>
-      <div class="flex-1">
+      <span
+        class={["mt-0.5 flex-shrink-0 text-xl leading-none", tk.icon].join(" ")}
+      >
+        <Fa icon={tk.fa} />
+      </span>
+
+      <div class="flex-1 min-w-0 pr-1">
         <Show when={props.toast.title}>
-          <div class="font-semibold mb-1">{props.toast.title}</div>
+          <p class={["text-sm font-semibold leading-snug", tk.title].join(" ")}>
+            {props.toast.title}
+          </p>
         </Show>
-        <div class="text-sm">{props.toast.message}</div>
+        <p class={["text-sm leading-relaxed mt-0.5", tk.msg].join(" ")}>
+          {props.toast.message}
+        </p>
       </div>
-      <div class="flex items-start">
-        <button
-          class="text-xs text-gray-500 hover:text-gray-700"
-          onClick={() => removeToast(props.toast.id)}
-        >
-          ×
-        </button>
-      </div>
+
+      <button
+        type="button"
+        class={[
+          "flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center",
+          "text-sm transition-colors duration-150 cursor-pointer -mt-0.5 -mr-0.5",
+          tk.close,
+        ].join(" ")}
+        onClick={() => removeToast(props.toast.id)}
+        aria-label="Tutup notifikasi"
+      >
+        <Fa icon={faTimes} />
+      </button>
+
+      <Show when={props.toast.timeout && props.toast.timeout > 0}>
+        <div
+          class={["absolute bottom-0 left-0 h-[3px] rounded-b-xl", tk.bar].join(
+            " ",
+          )}
+          style={{
+            width: "100%",
+            animation: `shrink ${props.toast.timeout}ms linear forwards`,
+          }}
+        />
+      </Show>
     </div>
   );
 }
 
 export default function Toast() {
-  let interval: number | undefined;
-
-  onMount(() => {
-    // placeholder
-  });
-
-  onCleanup(() => {
-    if (interval) clearInterval(interval);
-  });
-
   return (
-    <div class="fixed right-4 top-4 z-50 flex flex-col gap-3 w-96">
-      <For each={getToasts()}>
-        {(toast: IToast) => <ToastItem toast={toast} />}
-      </For>
-    </div>
+    <>
+      <style>{`
+        @keyframes shrink {
+          from { width: 100%; }
+          to   { width: 0%; }
+        }
+      `}</style>
+
+      <div
+        class={[
+          "fixed z-[9999] flex flex-col-reverse gap-2.5 pointer-events-none",
+          "bottom-4 left-1/2 -translate-x-1/2 w-[calc(100vw-2rem)]",
+          "sm:left-auto sm:right-5 sm:translate-x-0 sm:w-96",
+        ].join(" ")}
+        aria-live="polite"
+        aria-atomic="false"
+        aria-label="Notifikasi"
+      >
+        <For each={getToasts()}>
+          {(toast: IToast) => (
+            <div class="pointer-events-auto w-full">
+              <ToastItem toast={toast} />
+            </div>
+          )}
+        </For>
+      </div>
+    </>
   );
 }

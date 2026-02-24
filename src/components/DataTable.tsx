@@ -1,4 +1,14 @@
-import { createSignal, createEffect, Show, For, on, Resource } from "solid-js";
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  Show,
+  For,
+  on,
+  Resource,
+  Accessor,
+  batch,
+} from "solid-js";
 import {
   createSolidTable,
   getCoreRowModel,
@@ -37,6 +47,8 @@ interface DataTableProps<T = any> {
   columns: Resource<T[] | undefined>;
   action: ActionProp;
   refreshTrigger?: number;
+  /** Reactive accessor returning extra query params to merge into every data fetch */
+  extraParams?: Accessor<Record<string, string>>;
 }
 
 export default function DataTable<T = any>(props: DataTableProps<T>) {
@@ -72,7 +84,7 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
           accessorKey: col.data,
           header: col.title,
           enableSorting: col.sortable !== false,
-        }))
+        })),
       );
 
       if (
@@ -137,6 +149,13 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
       length: String(pagination().pageSize),
     };
 
+    if (props.extraParams) {
+      const extra = props.extraParams();
+      Object.entries(extra).forEach(([k, v]) => {
+        if (v !== undefined && v !== "") params[k] = v;
+      });
+    }
+
     if (debouncedGlobalFilter()) {
       params["search[value]"] = debouncedGlobalFilter();
       params["search[regex]"] = "false";
@@ -147,7 +166,7 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
     if (sortState.length > 0) {
       sortState.forEach((sort, index) => {
         const columnIndex = columns().findIndex(
-          (col: any) => col.accessorKey === sort.id
+          (col: any) => col.accessorKey === sort.id,
         );
 
         if (columnIndex !== -1) {
@@ -185,7 +204,7 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
       setRecordsFiltered(json.recordsFiltered || 0);
 
       const totalPages = Math.ceil(
-        (json.recordsFiltered || 0) / pagination().pageSize
+        (json.recordsFiltered || 0) / pagination().pageSize,
       );
       setPageCount(totalPages);
     } catch (err) {
@@ -254,45 +273,61 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
 
   createEffect(
     on(
-      () => !props.columns.loading,
-      () => {
-        if (searchDebounceTimer) {
-          clearTimeout(searchDebounceTimer);
+      () => props.columns.loading,
+      (isLoading) => {
+        if (isLoading) {
+          if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+          setData([]);
+          setColumns([]);
+          setIsConfigLoading(true);
+          setPagination({ pageIndex: 0, pageSize: 10 });
+          setSorting([]);
+          setGlobalFilter("");
+          setDebouncedGlobalFilter("");
+          setPageCount(0);
+          setRecordsTotal(0);
+          setRecordsFiltered(0);
+          if (searchInputRef) searchInputRef.value = "";
+        } else {
+          fetchConfig();
         }
+      },
+      { defer: true },
+    ),
+  );
 
-        setData([]);
-        setColumns([]);
-        setIsConfigLoading(true);
-        setPagination({ pageIndex: 0, pageSize: 10 });
-        setSorting([]);
-        setGlobalFilter("");
-        setDebouncedGlobalFilter("");
-        setPageCount(0);
-        setRecordsTotal(0);
-        setRecordsFiltered(0);
-
-        if (searchInputRef) searchInputRef.value = "";
-
-        fetchConfig();
-      }
-    )
+  const serializedExtra = createMemo(() =>
+    JSON.stringify(props.extraParams?.() ?? {}),
   );
 
   createEffect(
     on(
-      [isConfigLoading, pagination, sorting, debouncedGlobalFilter],
-      ([loading]) => !loading && fetchData()
-    )
+      [isConfigLoading, pagination, sorting, debouncedGlobalFilter] as const,
+      ([loading]) => !loading && fetchData(),
+    ),
   );
 
-  // external refresh trigger (e.g. parent updated data)
-  createEffect(() => {
-    const t = props.refreshTrigger;
-    if (t !== undefined) {
-      // attempt to fetch new data when trigger changes
-      fetchData();
-    }
-  });
+  createEffect(
+    on(
+      () => props.refreshTrigger,
+      () => {
+        if (!isConfigLoading()) fetchData();
+      },
+      { defer: true },
+    ),
+  );
+
+  createEffect(
+    on(
+      serializedExtra,
+      () => {
+        if (!isConfigLoading()) {
+          batch(() => setPagination((p) => ({ ...p, pageIndex: 0 })));
+        }
+      },
+      { defer: true },
+    ),
+  );
 
   const table = createSolidTable({
     get data() {
@@ -403,15 +438,15 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
                           <div class="flex items-center gap-2">
                             {flexRender(
                               header.column.columnDef.header,
-                              header.getContext()
+                              header.getContext(),
                             )}
                             <Show when={header.column.getCanSort()}>
                               <span class="text-gray-400 text-sm">
                                 {header.column.getIsSorted() === "asc"
                                   ? "↑"
                                   : header.column.getIsSorted() === "desc"
-                                  ? "↓"
-                                  : "↕"}
+                                    ? "↓"
+                                    : "↕"}
                               </span>
                             </Show>
                           </div>
@@ -444,7 +479,7 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
                           <td class="px-6 py-4 text-sm text-gray-900">
                             {flexRender(
                               cell.column.columnDef.cell,
-                              cell.getContext()
+                              cell.getContext(),
                             )}
                           </td>
                         )}
@@ -467,7 +502,7 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
             <span class="font-medium">
               {Math.min(
                 (pagination().pageIndex + 1) * pagination().pageSize,
-                recordsFiltered()
+                recordsFiltered(),
               )}
             </span>{" "}
             of <span class="font-medium">{recordsFiltered()}</span> entries
