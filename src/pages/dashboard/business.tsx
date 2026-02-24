@@ -309,6 +309,12 @@ const Business: Component = () => {
 
       grid.appendChild(formWrapper);
 
+      // placeholder for validation errors for this field
+      const errorPlaceholder = document.createElement("div");
+      errorPlaceholder.className = "mt-1 text-sm text-red-600 field-error";
+      errorPlaceholder.setAttribute("data-field", field.name);
+      formWrapper.appendChild(errorPlaceholder);
+
       if (values && values[field.name] !== undefined) {
         const el = modalFieldContainer.querySelector(
           `[name="${field.name}"]`
@@ -347,8 +353,34 @@ const Business: Component = () => {
     });
   });
 
+  const clearFormErrors = () => {
+    modalFieldContainer
+      .querySelectorAll<HTMLElement>('.field-error')
+      .forEach((el) => {
+        el.textContent = '';
+      });
+    modalFieldContainer
+      .querySelectorAll<HTMLInputElement>('input,select,textarea')
+      .forEach((el) => el.classList.remove('border-red-500'));
+  };
+
+  const showFieldError = (name: string, messages: string[]) => {
+    const container = modalFieldContainer.querySelector<HTMLElement>(
+      `.field-error[data-field="${name}"]`
+    );
+    if (container) {
+      container.innerHTML = messages.map((m) => `<div>${m}</div>`).join('');
+      const el = modalFieldContainer.querySelector<HTMLElement>(
+        `[name="${name}"]`
+      );
+      if (el) el.classList.add('border-red-500');
+    }
+  };
+
   const handleFormSubmit = async (e: Event) => {
     e.preventDefault();
+
+    clearFormErrors();
 
     modalFieldContainer
       .querySelectorAll<HTMLInputElement>('input[data-type="number"]')
@@ -400,9 +432,24 @@ const Business: Component = () => {
           toastError("Gagal menyimpan data.", "Error");
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Submit error", err);
-      toastError("Terjadi kesalahan saat menyimpan data.", "Error");
+      const data = err?.response?.data;
+      // if backend returns validation errors object, show them under inputs
+      if (data?.errors && typeof data.errors === 'object') {
+        Object.entries(data.errors).forEach(([field, msgs]) => {
+          const list = Array.isArray(msgs) ? msgs : [String(msgs)];
+          showFieldError(field, list);
+        });
+        // also scroll to first error field if needed
+        const firstField = Object.keys(data.errors)[0];
+        const firstEl = modalFieldContainer.querySelector(`[name="${firstField}"]`);
+        if (firstEl && typeof (firstEl as any).scrollIntoView === 'function') {
+          (firstEl as any).scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      } else {
+        toastError("Terjadi kesalahan saat menyimpan data.", "Error");
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -453,6 +500,8 @@ const Business: Component = () => {
         fields() || [],
         showEdit() ? selectedRow() ?? undefined : undefined
       );
+      // reset any previous error messages
+      clearFormErrors();
       attachNumberInputListeners();
     }
   });
