@@ -1,149 +1,11 @@
 import { Meta } from "@contexts";
-import {
-  faPlus,
-  faSave,
-  faTrash,
-  faChevronDown,
-  faChevronUp,
-  faSearch,
-  faTimes,
-  faStore,
-  faBuilding,
-  faLeaf,
-  faFish,
-  faStar,
-  faHeart,
-  faHome,
-  faCar,
-  faUtensils,
-  faShoppingCart,
-  faBoxOpen,
-  faMoneyBill,
-  faChartLine,
-  faUsers,
-  faCog,
-  faTag,
-  faGlobe,
-  faBolt,
-  faWater,
-  faMountain,
-  faTree,
-  faSeedling,
-  faPaw,
-  faTractor,
-  faIndustry,
-  faHammer,
-  faTools,
-  faWrench,
-  faBriefcase,
-  faLandmark,
-  faMosque,
-  faSchool,
-  faHospital,
-  faHotel,
-  faCamera,
-  faMusic,
-  faGamepad,
-  faPalette,
-  faFlask,
-  faMicroscope,
-  faLaptop,
-  faMobile,
-  faWifi,
-  faTruck,
-  faShip,
-  faPlane,
-  faBus,
-  faBicycle,
-  faMotorcycle,
-  faGripVertical,
-  faArrowLeft,
-  faShieldAlt,
-} from "@fortawesome/free-solid-svg-icons";
+import * as solidIcons from "@fortawesome/free-solid-svg-icons";
 import { useParams, useNavigate } from "@solidjs/router";
 import { ucFirst, success, error as toastError } from "@utils";
 import { api } from "@services";
 import Fa from "solid-fa";
-import { Component, createEffect, createSignal, For, Show } from "solid-js";
+import { Component, createEffect, createMemo, createSignal, For, Show } from "solid-js";
 import { createStore } from "solid-js/store";
-
-const iconCatalog = [
-  { name: "store",         icon: faStore        },
-  { name: "building",      icon: faBuilding     },
-  { name: "leaf",          icon: faLeaf         },
-  { name: "fish",          icon: faFish         },
-  { name: "star",          icon: faStar         },
-  { name: "heart",         icon: faHeart        },
-  { name: "home",          icon: faHome         },
-  { name: "car",           icon: faCar          },
-  { name: "utensils",      icon: faUtensils     },
-  { name: "shopping-cart", icon: faShoppingCart },
-  { name: "box-open",      icon: faBoxOpen      },
-  { name: "money-bill",    icon: faMoneyBill    },
-  { name: "chart-line",    icon: faChartLine    },
-  { name: "users",         icon: faUsers        },
-  { name: "cog",           icon: faCog          },
-  { name: "tag",           icon: faTag          },
-  { name: "globe",         icon: faGlobe        },
-  { name: "bolt",          icon: faBolt         },
-  { name: "water",         icon: faWater        },
-  { name: "mountain",      icon: faMountain     },
-  { name: "tree",          icon: faTree         },
-  { name: "seedling",      icon: faSeedling     },
-  { name: "paw",           icon: faPaw          },
-  { name: "tractor",       icon: faTractor      },
-  { name: "industry",      icon: faIndustry     },
-  { name: "hammer",        icon: faHammer       },
-  { name: "tools",         icon: faTools        },
-  { name: "wrench",        icon: faWrench       },
-  { name: "briefcase",     icon: faBriefcase    },
-  { name: "landmark",      icon: faLandmark     },
-  { name: "mosque",        icon: faMosque       },
-  { name: "school",        icon: faSchool       },
-  { name: "hospital",      icon: faHospital     },
-  { name: "hotel",         icon: faHotel        },
-  { name: "camera",        icon: faCamera       },
-  { name: "music",         icon: faMusic        },
-  { name: "gamepad",       icon: faGamepad      },
-  { name: "palette",       icon: faPalette      },
-  { name: "flask",         icon: faFlask        },
-  { name: "microscope",    icon: faMicroscope   },
-  { name: "laptop",        icon: faLaptop       },
-  { name: "mobile",        icon: faMobile       },
-  { name: "wifi",          icon: faWifi         },
-  { name: "truck",         icon: faTruck        },
-  { name: "ship",          icon: faShip         },
-  { name: "plane",         icon: faPlane        },
-  { name: "bus",           icon: faBus          },
-  { name: "bicycle",       icon: faBicycle      },
-  { name: "motorcycle",    icon: faMotorcycle   },
-];
-
-const INPUT_TYPES = [
-  { value: "text",     label: "Teks"         },
-  { value: "number",   label: "Angka"        },
-  { value: "currency", label: "Mata Uang"    },
-  { value: "date",     label: "Tanggal"      },
-  { value: "datetime", label: "Tgl & Waktu"  },
-  { value: "select",   label: "Pilihan"      },
-  { value: "textarea", label: "Teks Panjang" },
-  { value: "email",    label: "Email"        },
-  { value: "url",      label: "URL"          },
-  { value: "boolean",  label: "Ya / Tidak"   },
-];
-
-const TYPE_COLORS: Record<string, string> = {
-  text:     "bg-slate-100 text-slate-600",
-  number:   "bg-orange-50 text-orange-600",
-  currency: "bg-emerald-50 text-emerald-600",
-  date:     "bg-blue-50 text-blue-600",
-  datetime: "bg-indigo-50 text-indigo-600",
-  select:   "bg-purple-50 text-purple-600",
-  textarea: "bg-slate-100 text-slate-600",
-  email:    "bg-pink-50 text-pink-600",
-  url:      "bg-cyan-50 text-cyan-600",
-  boolean:  "bg-teal-50 text-teal-600",
-};
 
 interface FieldOption { label: string; value: string; }
 
@@ -168,8 +30,93 @@ interface BusinessField {
   expanded: boolean;
 }
 
+// build catalog once and normalize to dashed names (faShoppingCart → "shopping-cart")
+const iconCatalog = Object.entries(solidIcons)
+  .filter(([k]) => k.startsWith("fa") && k !== "fas" && k !== "prefix")
+  .map(([k, icon]) => {
+    const name = k
+      .replace(/^fa/, "")
+      .replace(/([A-Z])/g, "$1")
+      .toLowerCase();
+    return { name, icon };
+  });
+
+// map for quick lookup in picker/preview
+const iconMap = new Map(iconCatalog.map((i) => [i.name, i.icon]));
+
+const INPUT_TYPES = [
+  { value: "text", label: "Teks" },
+  { value: "number", label: "Angka" },
+  { value: "currency", label: "Mata Uang" },
+  { value: "date", label: "Tanggal" },
+  { value: "datetime", label: "Tgl & Waktu" },
+  { value: "select", label: "Pilihan" },
+  { value: "textarea", label: "Teks Panjang" },
+  { value: "email", label: "Email" },
+  { value: "url", label: "URL" },
+  { value: "boolean", label: "Ya / Tidak" },
+];
+
+const TYPE_COLORS: Record<string, string> = {
+  text: "bg-slate-100 text-slate-600",
+  number: "bg-orange-50 text-orange-600",
+  currency: "bg-emerald-50 text-emerald-600",
+  date: "bg-blue-50 text-blue-600",
+  datetime: "bg-indigo-50 text-indigo-600",
+  select: "bg-purple-50 text-purple-600",
+  textarea: "bg-slate-100 text-slate-600",
+  email: "bg-pink-50 text-pink-600",
+  url: "bg-cyan-50 text-cyan-600",
+  boolean: "bg-teal-50 text-teal-600",
+};
+
 const generateId = (): string =>
   Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+// validation rule builder sits at module scope so it doesn't get reallocated
+function buildValidationRules(f: BusinessField): string[] {
+  const rules: string[] = [];
+  if (f.required) rules.push("required");
+  switch (f.type) {
+    case "currency":
+    case "number":
+      rules.push("numeric");
+      if (f.validation.min !== undefined && !isNaN(f.validation.min)) rules.push(`min:${f.validation.min}`);
+      if (f.validation.max !== undefined && !isNaN(f.validation.max)) rules.push(`max:${f.validation.max}`);
+      break;
+    case "text":
+    case "textarea":
+      rules.push("string");
+      if (f.validation.minLength !== undefined && !isNaN(f.validation.minLength)) rules.push(`min:${f.validation.minLength}`);
+      if (f.validation.maxLength !== undefined && !isNaN(f.validation.maxLength)) rules.push(`max:${f.validation.maxLength}`);
+      break;
+    case "email":
+      rules.push("email");
+      break;
+    case "url":
+      rules.push("url");
+      break;
+    // date/datetime/boolean/select don't require extra rules here
+  }
+  if (f.type === "select" && f.options.length) {
+    const vals = f.options.map((o) => o.value).filter(Boolean).join(",");
+    if (vals) rules.push(`in:${vals}`);
+  }
+  if (f.validation.pattern) rules.push(`regex:${f.validation.pattern}`);
+  return rules;
+}
+
+function serializeField(f: BusinessField, index: number) {
+  return {
+    name: f.name,
+    label: f.label,
+    type: f.type === "currency" ? "number" : f.type,
+    order: index + 1,
+    placeholder: f.placeholder,
+    validation_rules: buildValidationRules(f),
+    options: f.type === "select" ? f.options.map((o) => o.value).filter(Boolean) : [],
+  };
+}
 
 const toSlugLocal = (str: string) =>
   str.toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
@@ -177,7 +124,7 @@ const toSlugLocal = (str: string) =>
 const defaultFields = (): BusinessField[] => [
   {
     id: generateId(), label: "Tanggal Transaksi", name: "transaction_date",
-    type: "date", order: 1, placeholder: "", required: true, filterable: true,
+    type: "date", order: 1, placeholder: "Masukan Tanggal Transaksi", required: true, filterable: true,
     validation: {}, options: [], expanded: false,
   },
   {
@@ -193,7 +140,7 @@ const defaultFields = (): BusinessField[] => [
 ];
 
 const AddBusiness: Component = () => {
-  const { changeTitle } = Meta.useMeta();
+  const { changeTitle, changeSidebarRefresh } = Meta.useMeta();
   const params = useParams<{ role: string }>();
   const navigate = useNavigate();
 
@@ -206,13 +153,15 @@ const AddBusiness: Component = () => {
   const [isSubmitting, setIsSubmitting] = createSignal(false);
   const [fields, setFields] = createStore<BusinessField[]>(defaultFields());
 
-  const filteredIcons = () =>
+  const filteredIcons = createMemo(() =>
     iconSearch()
       ? iconCatalog.filter((i) => i.name.includes(iconSearch().toLowerCase()))
-      : iconCatalog;
+      : iconCatalog
+  );
 
-  const selectedIconObj = () =>
-    iconCatalog.find((i) => i.name === selectedIcon()) ?? null;
+  const selectedIconObj = createMemo(() =>
+    selectedIcon() ? iconMap.get(selectedIcon()!) || null : null
+  );
 
   const addField = () =>
     setFields((f) => [
@@ -250,61 +199,33 @@ const AddBusiness: Component = () => {
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
-    if (!businessName().trim()) { toastError("Nama usaha wajib diisi.", "Error"); return; }
+    const name = businessName().trim();
+    if (!name) {
+      toastError("Nama usaha wajib diisi.", "Error");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
-      const buildValidationRules = (f: BusinessField): string[] => {
-        const rules: string[] = [];
-        if (f.required) rules.push("required");
-        if (f.type === "currency" || f.type === "number") rules.push("numeric");
-        if (f.type === "text" || f.type === "textarea")   rules.push("string");
-        if (f.type === "email")                           rules.push("email");
-        if (f.type === "url")                             rules.push("url");
-        if ((f.type === "number" || f.type === "currency") && f.validation.min !== undefined && !isNaN(f.validation.min))
-          rules.push(`min:${f.validation.min}`);
-        if ((f.type === "number" || f.type === "currency") && f.validation.max !== undefined && !isNaN(f.validation.max))
-          rules.push(`max:${f.validation.max}`);
-        if ((f.type === "text" || f.type === "textarea") && f.validation.minLength !== undefined && !isNaN(f.validation.minLength))
-          rules.push(`min:${f.validation.minLength}`);
-        if ((f.type === "text" || f.type === "textarea") && f.validation.maxLength !== undefined && !isNaN(f.validation.maxLength))
-          rules.push(`max:${f.validation.maxLength}`);
-        if (f.type === "select" && f.options.length > 0) {
-          const vals = f.options.map((o) => o.value).filter(Boolean).join(",");
-          if (vals) rules.push(`in:${vals}`);
-        }
-        if (f.validation.pattern) rules.push(`regex:${f.validation.pattern}`);
-        return rules;
+      const payload = {
+        name,
+        icon: selectedIcon(),
+        fields: fields.map(serializeField),
       };
 
-      const payload = {
-        name: businessName().trim(),
-        icon: selectedIcon(),
-        fields: fields.map((f, i) => ({
-          name: f.name,
-          label: f.label,
-          type: f.type === "currency" ? "number" : f.type,
-          order: i + 1,
-          placeholder: f.placeholder,
-          validation_rules: buildValidationRules(f),
-          options: f.type === "select"
-            ? f.options.map((o) => o.value).filter(Boolean)
-            : [],
-        })),
-      };
-      console.log("Payload:", JSON.stringify(payload, null, 2));
       const res = await api.post(`/dashboard/${params.role}/business`, payload);
+
       if (res.status === 200 || res.status === 201) {
+        changeSidebarRefresh(true);
         success("Usaha berhasil ditambahkan.", "Berhasil");
         navigate("/");
       } else {
-        toastError("Gagal menambahkan usaha.", "Error");
+        const errMsg = res.data?.message || "Gagal menambahkan usaha.";
+        toastError(errMsg, "Error");
       }
     } catch (err: any) {
       const data = err?.response?.data;
-      console.error("Error detail:", JSON.stringify(data, null, 2));
       const msg = data?.message ?? data?.error ?? "Terjadi kesalahan.";
-      const errDetail = data?.errors ? "\n" + JSON.stringify(data.errors, null, 2) : "";
-      console.error("Errors:", errDetail);
       toastError(msg, "Error");
     } finally {
       setIsSubmitting(false);
@@ -329,12 +250,10 @@ const AddBusiness: Component = () => {
   return (
     <div class="w-full pb-20">
       <form onSubmit={handleSubmit} class="space-y-3">
-
         <div class="bg-white border border-gray-100 shadow-sm overflow-hidden rounded-2xl">
-
           <div class="flex items-center gap-3 px-5 py-4 border-b border-gray-100">
             <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-sm shadow-blue-200">
-              <Fa icon={faStore} class="text-white text-xs" />
+              <Fa icon={solidIcons.faStore} class="text-white text-xs" />
             </div>
             <div>
               <p class="text-sm font-bold text-gray-800">Informasi Usaha</p>
@@ -378,26 +297,26 @@ const AddBusiness: Component = () => {
                     fallback={
                       <div class="flex items-center gap-3">
                         <div class="w-7 h-7 border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center">
-                          <Fa icon={faStar} class="text-gray-200 text-xs" />
+                          <Fa icon={solidIcons.faStar} class="text-gray-200 text-xs" />
                         </div>
                         <span class="text-sm text-gray-300">Pilih ikon...</span>
                       </div>
                     }
                   >
                     <div class="w-7 h-7 bg-blue-600 rounded-xl flex items-center justify-center shadow-sm shadow-blue-200">
-                      <Fa icon={selectedIconObj()!.icon} class="text-white text-xs" />
+                      <Fa icon={selectedIconObj() as solidIcons.IconDefinition} class="text-white text-xs" />
                     </div>
                     <span class="text-sm font-medium text-gray-700">{selectedIcon()}</span>
                   </Show>
                 </div>
-                <Fa icon={iconPickerOpen() ? faChevronUp : faChevronDown} class="text-gray-300 text-xs" />
+                <Fa icon={iconPickerOpen() ? solidIcons.faChevronUp : solidIcons.faChevronDown} class="text-gray-300 text-xs" />
               </button>
 
               <Show when={iconPickerOpen()}>
                 <div class="mt-2 border border-gray-200 rounded-2xl bg-white shadow-xl shadow-gray-100 overflow-hidden">
                   <div class="p-2.5 border-b border-gray-100 bg-gray-50">
                     <div class="relative">
-                      <Fa icon={faSearch} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs" />
+                      <Fa icon={solidIcons.faSearch} class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300 text-xs" />
                       <input
                         type="text"
                         class="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all bg-white"
@@ -414,7 +333,7 @@ const AddBusiness: Component = () => {
                       title="Tanpa ikon"
                       onClick={() => { setSelectedIcon(null); setIconPickerOpen(false); }}
                     >
-                      <Fa icon={faTimes} class="text-xs" />
+                      <Fa icon={solidIcons.faTimes} class="text-xs" />
                     </button>
                     <For each={filteredIcons()}>
                       {(item) => (
@@ -428,7 +347,7 @@ const AddBusiness: Component = () => {
                           }}
                           onClick={() => { setSelectedIcon(item.name); setIconPickerOpen(false); }}
                         >
-                          <Fa icon={item.icon} />
+                          <Fa icon={item.icon as solidIcons.IconDefinition} />
                         </button>
                       )}
                     </For>
@@ -444,7 +363,7 @@ const AddBusiness: Component = () => {
           <div class="flex items-center justify-between gap-3 px-5 py-4 border-b border-gray-100">
             <div class="flex items-center gap-3">
               <div class="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0">
-                <Fa icon={faTag} class="text-white text-xs" />
+                <Fa icon={solidIcons.faTag} class="text-white text-xs" />
               </div>
               <div>
                 <p class="text-sm font-bold text-gray-800">Field Transaksi</p>
@@ -456,7 +375,7 @@ const AddBusiness: Component = () => {
               onClick={addField}
               class="inline-flex items-center gap-1.5 bg-blue-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl hover:bg-blue-700 active:scale-95 transition-all cursor-pointer"
             >
-              <Fa icon={faPlus} class="text-[9px]" />
+              <Fa icon={solidIcons.faPlus} class="text-[9px]" />
               Tambah Field
             </button>
           </div>
@@ -468,7 +387,7 @@ const AddBusiness: Component = () => {
                 <div class="bg-gray-50 rounded-xl border border-gray-200/60 overflow-hidden">
 
                   <div class="flex items-center gap-2.5 px-3.5 py-3">
-                    <Fa icon={faGripVertical} class="text-gray-300 cursor-grab flex-shrink-0" />
+                    <Fa icon={solidIcons.faGripVertical} class="text-gray-300 cursor-grab flex-shrink-0" />
 
                     <div class="w-5 h-5 rounded-md bg-gray-200 flex items-center justify-center flex-shrink-0">
                       <span class="text-[9px] font-bold text-gray-500">{idx() + 1}</span>
@@ -489,14 +408,14 @@ const AddBusiness: Component = () => {
                         class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-all cursor-pointer"
                         onClick={() => toggleExpand(field.id)}
                       >
-                        <Fa icon={field.expanded ? faChevronUp : faChevronDown} class="text-xs" />
+                        <Fa icon={field.expanded ? solidIcons.faChevronUp : solidIcons.faChevronDown} class="text-xs" />
                       </button>
                       <button
                         type="button"
                         class="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-100 text-gray-300 hover:text-red-500 transition-all cursor-pointer"
                         onClick={() => removeField(field.id)}
                       >
-                        <Fa icon={faTrash} class="text-[10px]" />
+                        <Fa icon={solidIcons.faTrash} class="text-[10px]" />
                       </button>
                     </div>
                   </div>
@@ -661,7 +580,7 @@ const AddBusiness: Component = () => {
                               class="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-bold cursor-pointer bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-lg transition-colors"
                               onClick={() => addOption(field.id)}
                             >
-                              <Fa icon={faPlus} class="text-[9px]" />
+                              <Fa icon={solidIcons.faPlus} class="text-[9px]" />
                               Tambah pilihan
                             </button>
                           </div>
@@ -691,7 +610,7 @@ const AddBusiness: Component = () => {
                                     class="w-8 h-8 flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 rounded-xl transition-colors cursor-pointer flex-shrink-0"
                                     onClick={() => removeOption(field.id, idx())}
                                   >
-                                    <Fa icon={faTimes} class="text-xs" />
+                                    <Fa icon={solidIcons.faTimes} class="text-xs" />
                                   </button>
                                 </div>
                               )}
@@ -714,7 +633,7 @@ const AddBusiness: Component = () => {
             <Show when={fields.length === 0}>
               <div class="border-2 border-dashed border-gray-200 rounded-xl py-10 flex flex-col items-center justify-center text-center">
                 <div class="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
-                  <Fa icon={faTag} class="text-gray-300" />
+                  <Fa icon={solidIcons.faTag} class="text-gray-300" />
                 </div>
                 <p class="text-sm font-semibold text-gray-400">Belum ada field</p>
                 <p class="text-xs text-gray-300 mt-0.5">Klik "Tambah Field" untuk mulai</p>
@@ -730,7 +649,7 @@ const AddBusiness: Component = () => {
             class="inline-flex items-center justify-center gap-2 bg-white text-gray-600 py-3 px-5 text-sm font-semibold rounded-2xl border border-gray-200 hover:bg-gray-50 hover:border-gray-300 active:scale-95 transition-all cursor-pointer shadow-sm"
             onClick={() => navigate("/")}
           >
-            <Fa icon={faArrowLeft} class="text-xs" />
+            <Fa icon={solidIcons.faArrowLeft} class="text-xs" />
             Batal
           </button>
           <button
@@ -739,7 +658,7 @@ const AddBusiness: Component = () => {
             class="flex-1 inline-flex items-center justify-center gap-2 bg-blue-600 text-white py-3 text-sm font-bold rounded-2xl hover:bg-blue-700 active:scale-95 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-blue-200"
           >
             <Fa
-              icon={isSubmitting() ? faSearch : faSave}
+              icon={isSubmitting() ? solidIcons.faSearch : solidIcons.faSave}
               class={`text-xs ${isSubmitting() ? "animate-spin" : ""}`}
             />
             {isSubmitting() ? "Menyimpan..." : "Simpan Usaha"}

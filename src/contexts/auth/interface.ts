@@ -21,6 +21,7 @@ interface IAuthContext {
   updateData: (category: EAuthUpdateCategory, data: any) => void;
   logoutUser: () => void;
   checked: Accessor<boolean>;
+  refreshUserData: () => Promise<void>;
 }
 
 export type {

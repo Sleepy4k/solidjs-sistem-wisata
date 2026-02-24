@@ -4,7 +4,7 @@ import { createSignal, createEffect, Component, Show } from "solid-js";
 import { EMAIL_KEY_PREFIX, TOKEN_KEY_PREFIX } from "@consts";
 import { IAuthUserData, IProviderProp } from "./interface";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
-import { LocalStorage, println, success, error as toastError } from "@utils";
+import { LocalStorage, println, error as toastError } from "@utils";
 import { api } from "@services";
 
 const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
@@ -127,9 +127,24 @@ const AuthProvider: Component<IProviderProp> = (props: IProviderProp) => {
     loadSession();
   });
 
+  const refreshUserData = async () => {
+    try {
+      const res = await api.get("/dashboard/profile");
+      const userData = res.data.data;
+      if (!userData) {
+        throw new Error("Gagal mengambil data pengguna");
+      }
+
+      setUser(userData);
+    } catch (error: any) {
+      println("Refresh User Data Error", error.message, EDebugType.ERROR);
+      toastError("Gagal memperbarui data pengguna.", "Error");
+    }
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, isLogged, authToken, updateData, logoutUser, checked }}
+      value={{ user, isLogged, authToken, updateData, logoutUser, checked, refreshUserData }}
     >
       <Show
         when={checked()}

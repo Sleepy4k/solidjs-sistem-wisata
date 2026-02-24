@@ -2,9 +2,7 @@ import { println, error as toastError } from "@utils";
 import api from "./api.service"
 import { EDebugType } from "@enums";
 
-const getSidebarItems = async (isCanLoad: boolean) => {
-  if (!isCanLoad) return;
-
+const getSidebarItems = async () => {
   try {
     const response = await api.get("/dashboard/sidebar");
     if (response.status !== 200) {

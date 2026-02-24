@@ -1,16 +1,11 @@
-import {
-  faBuilding,
-  faChartLine,
-  faPlusCircle,
-  faShop,
-  faStore,
-} from "@fortawesome/free-solid-svg-icons";
+import * as solidIcons from "@fortawesome/free-solid-svg-icons";
 import { getSidebarItems } from "@services";
 import { A } from "@solidjs/router";
 import { firstChar, toSlug } from "@utils";
 import Fa from "solid-fa";
-import { createResource, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createResource, For, onCleanup, onMount, Show } from "solid-js";
 import LogoTelkom from "@assets/images/telkom.png";
+import { Auth, Meta } from "@contexts";
 
 interface IMenuItem {
   id?: number;
@@ -35,33 +30,47 @@ interface ISidebarProp {
   isLoading?: boolean;
 }
 
-const generateIcon = (index: number) => {
-  const icons = [faStore, faBuilding, faShop];
-  return icons[index % icons.length];
+interface IconItem { name: string; icon: solidIcons.IconDefinition; }
+
+const iconCatalog: IconItem[] = Object.entries(solidIcons)
+  .filter(([k]) => k.startsWith("fa") && k !== "fas" && k !== "prefix")
+  .map(([k, icon]) => {
+    const name = k
+      .replace(/^fa/, "")
+      .replace(/([A-Z])/g, "$1")
+      .toLowerCase();
+    return { name, icon } as IconItem;
+  });
+
+const iconMap = new Map(iconCatalog.map((i) => [i.name, i.icon]));
+
+const generateIcon = (iconName?: string) => {
+  if (!iconName) return solidIcons.faStore;
+  return iconMap.get(iconName) ?? solidIcons.faStore;
 };
 
 export default function Sidebar(props: ISidebarProp) {
-  const [sidebarData, _] = createResource(
-    () => props.isLoading,
-    getSidebarItems
-  );
+  const { refreshUserData } = Auth.useAuth();
+  const { sidebarRefresh, changeSidebarRefresh } = Meta.useMeta();
+  const [sidebarData, { refetch }] = createResource(async () => {
+    const data = await getSidebarItems();
+    changeSidebarRefresh(false);
+    return data;
+  });
+
+  createEffect(() => {
+    if (sidebarRefresh() || props.isLoading) {
+      refetch();
+      if (sidebarRefresh()) refreshUserData();
+    }
+  });
 
   const hasPermission = (sidebar: IMenuItem): boolean => {
-    if (!sidebar.meta?.permissions) {
-      return true;
-    }
+    const perms = sidebar.meta?.permissions;
+    if (!perms || perms.length === 0) return true;
+    if (!props.userPermissions) return false;
 
-    if (sidebar.meta?.permissions && sidebar.meta.permissions.length > 0) {
-      if (!props.userPermissions) return false;
-
-      const hasPermission = sidebar.meta.permissions.some((perm) =>
-        props.userPermissions?.includes(perm)
-      );
-
-      if (!hasPermission) return false;
-    }
-
-    return true;
+    return perms.some((p) => props.userPermissions!.includes(p));
   };
 
   const getMenuRole = (sidebar: IMenuItem): string => {
@@ -129,7 +138,7 @@ export default function Sidebar(props: ISidebarProp) {
               activeClass="bg-blue-600 text-white shadow-lg hover:text-blue-700"
               end
             >
-              <Fa icon={faChartLine} class="w-5 h-5" />
+              <Fa icon={solidIcons.faChartLine} class="w-5 h-5" />
               <span>Dashboard</span>
             </A>
 
@@ -190,9 +199,9 @@ export default function Sidebar(props: ISidebarProp) {
                       >
                         <Show
                           when={item.is_datatable}
-                          fallback={<Fa icon={faPlusCircle} class="w-5 h-5" />}
+                          fallback={<Fa icon={solidIcons.faPlusCircle} class="w-5 h-5" />}
                         >
-                          <Fa icon={generateIcon(index())} class="w-5 h-5" />
+                          <Fa icon={generateIcon(item.meta?.icon) as solidIcons.IconDefinition} class="w-5 h-5" />
                         </Show>
                         <span>{item.name}</span>
                       </A>
