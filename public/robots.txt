@@ -1,0 +1,10 @@
+User-agent: *
+
+Disallow: /assets/
+Disallow: /dashboard/
+
+Allow: /login
+
+Crawl-delay: 10
+
+Sitemap: https://siswis.burunghantu.id/sitemap.xml 
