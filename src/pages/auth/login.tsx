@@ -3,7 +3,8 @@ import { api } from "@services";
 import { useNavigate } from "@solidjs/router";
 import { Auth, Meta } from "@contexts";
 import { EAuthUpdateCategory, EDebugType } from "@enums";
-import { println, success, error as toastError } from "@utils";
+import { println, success, error as toastError, LocalStorage } from "@utils";
+import { TOKEN_KEY_PREFIX } from "@consts";
 import Fa from "solid-fa";
 import {
   faEnvelope,
@@ -91,8 +92,8 @@ const Login: Component = () => {
         password: passwordInput.value,
       })
       .then((response) => {
-        const { success, data, message } = response.data;
-        if (!success) throw new Error("Login gagal");
+        const { success: ok, data, message } = response.data;
+        if (!ok) throw new Error("Login gagal");
 
         const { user, access_token } = data;
         updateData(EAuthUpdateCategory.IS_LOGGED, true);
@@ -101,9 +102,17 @@ const Login: Component = () => {
 
         println("Login", message, EDebugType.SUCCESS);
         success(message || "Berhasil masuk.", "Berhasil");
-        navigate("/", { replace: true });
+        setTimeout(() => navigate("/", { replace: true }), 50);
       })
       .catch((error) => {
+        console.debug("login catch", error);
+        const stored = LocalStorage.getItem(TOKEN_KEY_PREFIX);
+        if (stored) {
+          success("Login berhasil.", "Berhasil");
+          setTimeout(() => navigate("/", { replace: true }), 50);
+          return;
+        }
+
         if (error.response && error.response.status === 422) {
           const responseData = error.response.data;
           println(

@@ -309,7 +309,6 @@ const Business: Component = () => {
 
       grid.appendChild(formWrapper);
 
-      // placeholder for validation errors for this field
       const errorPlaceholder = document.createElement("div");
       errorPlaceholder.className = "mt-1 text-sm text-red-600 field-error";
       errorPlaceholder.setAttribute("data-field", field.name);
@@ -435,13 +434,11 @@ const Business: Component = () => {
     } catch (err: any) {
       console.error("Submit error", err);
       const data = err?.response?.data;
-      // if backend returns validation errors object, show them under inputs
       if (data?.errors && typeof data.errors === 'object') {
         Object.entries(data.errors).forEach(([field, msgs]) => {
           const list = Array.isArray(msgs) ? msgs : [String(msgs)];
           showFieldError(field, list);
         });
-        // also scroll to first error field if needed
         const firstField = Object.keys(data.errors)[0];
         const firstEl = modalFieldContainer.querySelector(`[name="${firstField}"]`);
         if (firstEl && typeof (firstEl as any).scrollIntoView === 'function') {
@@ -500,7 +497,6 @@ const Business: Component = () => {
         fields() || [],
         showEdit() ? selectedRow() ?? undefined : undefined
       );
-      // reset any previous error messages
       clearFormErrors();
       attachNumberInputListeners();
     }
@@ -684,7 +680,6 @@ const Business: Component = () => {
         >
           <div class="relative w-full max-w-md bg-white rounded-xl shadow-2xl flex flex-col max-h-[85vh]">
 
-            {/* Header */}
             <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <h3 class="text-sm font-semibold text-gray-800">{modalTitleText()}</h3>
               <button
