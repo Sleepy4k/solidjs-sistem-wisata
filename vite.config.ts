@@ -40,7 +40,7 @@ export default defineConfig({
   },
   build: {
     target: "esnext",
-    chunkSizeWarningLimit: 175,
+    chunkSizeWarningLimit: 925,
     rollupOptions: {
       output: {
         manualChunks: {
@@ -58,6 +58,9 @@ export default defineConfig({
           table: ["@tanstack/solid-table"],
           parse: ["@utils/parse.ts"],
           storage: ["@utils/storage.ts"],
+          toast: ["@components/Toast.tsx", "@utils/toast.ts"],
+          "logout-modal": ["@components/LogoutModal.tsx"],
+          "top-loader": ["@components/TopLoader.tsx"],
         },
       },
     },
