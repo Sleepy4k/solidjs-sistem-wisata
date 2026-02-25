@@ -19,10 +19,11 @@ import {
   faSpinner,
   faTimes,
   faWallet,
+  faCog
 } from "@fortawesome/free-solid-svg-icons";
 import { getCardsData, getColumnsData, getFieldsData, getFormulas, api } from "@services";
 import { IField, IFieldOption, ICard, IColumn } from "../../types/dashboard";
-import { Params, useParams, useSearchParams } from "@solidjs/router";
+import { Params, useParams, useSearchParams, useNavigate} from "@solidjs/router";
 import {
   formatCurrency,
   toSlug,
@@ -109,6 +110,7 @@ const Business: Component = () => {
   const { changeTitle } = Meta.useMeta();
   const params = useParams<IParamData>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [fields] = createResource(
     () => ({ role: params.role, slug: params.slug || "" }),
@@ -564,8 +566,6 @@ const Business: Component = () => {
     recalculate();
   };
 
-  // (add/edit modals are opened via inline onClick — no imperative listeners needed)
-
   const clearFormErrors = () => {
     modalFieldContainer
       .querySelectorAll<HTMLElement>(".field-error")
@@ -850,6 +850,16 @@ const Business: Component = () => {
             >
               <Fa icon={faRefresh} />
               <span>Reset</span>
+            </button>
+            <button
+              onClick={() =>
+                navigate(`/manajemen-usaha/${params.role}/${params.slug}`)
+              }
+              class="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
+            >
+              <Fa icon={faCog} />
+              <span class="hidden sm:inline">Manajemen Usaha</span>
+              <span class="sm:hidden">Kelola</span>
             </button>
           </div>
         </div>
