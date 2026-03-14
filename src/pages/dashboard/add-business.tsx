@@ -208,7 +208,7 @@ const AddBusiness: Component = () => {
   const params = useParams<{ role: string }>();
   const navigate = useNavigate();
 
-  createEffect(() => changeTitle(`Tambah Usaha — ${ucFirst(params.role)}`));
+  createEffect(() => changeTitle(`Tambah Usaha - ${ucFirst(params.role)}`));
 
   const [businessName, setBusinessName] = createSignal("");
   const [selectedIcon, setSelectedIcon] = createSignal<string | null>(null);

@@ -1,5 +1,5 @@
 import DataTable from "@components/DataTable";
-import { Meta } from "@contexts";
+import { Auth, Meta } from "@contexts";
 import {
   faArrowDown,
   faArrowUp,
@@ -107,6 +107,7 @@ const OPERATOR_SYMBOLS: Record<FormulaOperator, string> = {
 };
 
 const Business: Component = () => {
+  const { user } = Auth.useAuth();
   const { changeTitle } = Meta.useMeta();
   const params = useParams<IParamData>();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -717,7 +718,6 @@ const Business: Component = () => {
     );
   });
 
-
   createEffect(() => {
     if ((showAdd() || showEdit()) && modalFieldContainer) {
       populateFormFields(
@@ -783,21 +783,21 @@ const Business: Component = () => {
             Filter dan Aksi Data
           </h2>
           <div class="flex flex-wrap gap-1.5">
-            {/* Add Data */}
-            <button
-              onClick={() => {
-                setModalTitleText("Tambah Data");
-                setSelectedRow(null);
-                setShowAdd(true);
-              }}
-              class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
-            >
-              <Fa icon={faPlus} />
-              <span class="hidden sm:inline">Tambah Data</span>
-              <span class="sm:hidden">Tambah</span>
-            </button>
+            <Show when={user()?.role === params.role}>
+              <button
+                onClick={() => {
+                  setModalTitleText("Tambah Data");
+                  setSelectedRow(null);
+                  setShowAdd(true);
+                }}
+                class="inline-flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
+              >
+                <Fa icon={faPlus} />
+                <span class="hidden sm:inline">Tambah Data</span>
+                <span class="sm:hidden">Tambah</span>
+              </button>
+            </Show>
 
-            {/* Export Excel */}
             <button
               onClick={() => handleExport("excel")}
               disabled={!!exportingType()}
@@ -813,7 +813,6 @@ const Business: Component = () => {
               <span class="sm:hidden">Excel</span>
             </button>
 
-            {/* Export PDF */}
             <button
               onClick={() => handleExport("pdf")}
               disabled={!!exportingType()}
@@ -829,7 +828,6 @@ const Business: Component = () => {
               <span class="sm:hidden">PDF</span>
             </button>
 
-            {/* Print */}
             <button
               onClick={() => handleExport("print")}
               disabled={!!exportingType()}
@@ -844,6 +842,7 @@ const Business: Component = () => {
               <span class="hidden sm:inline">Cetak Tabel</span>
               <span class="sm:hidden">Cetak</span>
             </button>
+
             <button
               class="inline-flex items-center gap-1.5 bg-gray-100 text-gray-700 px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg hover:bg-gray-200 transition-colors text-xs md:text-sm font-medium cursor-pointer"
               onClick={resetFilters}
@@ -851,16 +850,19 @@ const Business: Component = () => {
               <Fa icon={faRefresh} />
               <span>Reset</span>
             </button>
-            <button
-              onClick={() =>
-                navigate(`/manajemen-usaha/${params.role}/${params.slug}`)
-              }
-              class="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
-            >
-              <Fa icon={faCog} />
-              <span class="hidden sm:inline">Manajemen Usaha</span>
-              <span class="sm:hidden">Kelola</span>
-            </button>
+
+            <Show when={user()?.role === params.role}>
+              <button
+                onClick={() =>
+                  navigate(`/manajemen-usaha/${params.role}/${params.slug}`)
+                }
+                class="inline-flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-lg cursor-pointer transition-colors shadow-sm text-xs md:text-sm font-medium"
+              >
+                <Fa icon={faCog} />
+                <span class="hidden sm:inline">Manajemen Usaha</span>
+                <span class="sm:hidden">Kelola</span>
+              </button>
+            </Show>
           </div>
         </div>
 
@@ -951,7 +953,6 @@ const Business: Component = () => {
         </div>
       </div>
 
-      {/* ── Data Table ── */}
       <div class="bg-white rounded-xl shadow overflow-hidden">
         <div class="overflow-x-auto">
           <DataTable<IColumn>
@@ -959,6 +960,8 @@ const Business: Component = () => {
             endpoint={`/dashboard/${params.role}/${params.slug}`}
             refreshTrigger={tableKey()}
             extraParams={filterParams}
+            user_role={user()?.role}
+            allowed_action={[params.role]}
             action={{
               enableEdit: true,
               enableDelete: true,

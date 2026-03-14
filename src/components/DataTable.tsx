@@ -47,6 +47,8 @@ interface DataTableProps<T = any> {
   columns: Resource<T[] | undefined>;
   action: ActionProp;
   refreshTrigger?: number;
+  user_role?: string;
+  allowed_action?: string[];
   /** Reactive accessor returning extra query params to merge into every data fetch */
   extraParams?: Accessor<Record<string, string>>;
 }
@@ -89,7 +91,8 @@ export default function DataTable<T = any>(props: DataTableProps<T>) {
 
       if (
         !colsData.find((col: BackendColumn) => col.data === "actions") &&
-        (props.action.enableEdit || props.action.enableDelete)
+        (props.action.enableEdit || props.action.enableDelete) &&
+        props.allowed_action?.includes(props.user_role || "")
       ) {
         setColumns((cols) => [
           ...cols,

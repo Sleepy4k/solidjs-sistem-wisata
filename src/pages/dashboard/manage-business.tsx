@@ -53,7 +53,6 @@ interface Formula {
   order: number;
 }
 
-/* ─── Constants ─── */
 const INPUT_TYPES = [
   { value: "text", label: "Teks" },
   { value: "number", label: "Angka" },
@@ -779,7 +778,7 @@ const ManageBusiness: Component = () => {
   const navigate = useNavigate();
 
   createEffect(() =>
-    changeTitle(`Manajemen Usaha — ${ucFirst(params.role)}`)
+    changeTitle(`Manajemen Usaha - ${ucFirst(params.role)}`)
   );
 
   const [fieldsResource] = createResource(
@@ -1087,8 +1086,6 @@ const ManageBusiness: Component = () => {
     }
   };
 
-
-
   const Skeleton = () => (
     <div class="space-y-3 animate-pulse">
       <div class="h-12 bg-gray-100 rounded-xl" />
@@ -1110,7 +1107,9 @@ const ManageBusiness: Component = () => {
           </button>
           <div>
             <h1 class="text-base font-bold text-gray-800">Manajemen Usaha</h1>
-            <p class="text-xs text-gray-400 capitalize">{params.slug.replace(/-/g, " ")}</p>
+            <p class="text-xs text-gray-400 capitalize">
+              {params.slug.replace(/-/g, " ")}
+            </p>
           </div>
         </div>
 
@@ -1196,43 +1195,48 @@ const ManageBusiness: Component = () => {
                 </button>
               </div>
 
-              <Show when={!isLoaded()} fallback={
-                <div class="space-y-2">
-                  <For each={fields}>
-                    {(field, idx) => (
-                      <FieldItem
-                        field={field}
-                        idx={idx()}
-                        resultFieldNames={resultFieldNames()}
-                        draggingIndex={dragIndex}
-                        toggleExpand={toggleExpand}
-                        removeField={removeField}
-                        updateLabel={updateLabel}
-                        updateField={updateField}
-                        updateValidation={updateValidation}
-                        addOption={addOption}
-                        updateOption={updateOption}
-                        removeOption={removeOption}
-                        onDragStart={onDragStart}
-                        onDragOver={onDragOver}
-                        onDrop={onDrop}
-                        onDragEnd={onDragEnd}
-                      />
-                    )}
-                  </For>
-                  <Show when={fields.length === 0}>
-                    <div class="border-2 border-dashed border-gray-200 rounded-xl py-10 flex flex-col items-center justify-center text-center">
-                      <div class="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
-                        <Fa icon={solidIcons.faTag} class="text-gray-300" />
+              <Show
+                when={!isLoaded()}
+                fallback={
+                  <div class="space-y-2">
+                    <For each={fields}>
+                      {(field, idx) => (
+                        <FieldItem
+                          field={field}
+                          idx={idx()}
+                          resultFieldNames={resultFieldNames()}
+                          draggingIndex={dragIndex}
+                          toggleExpand={toggleExpand}
+                          removeField={removeField}
+                          updateLabel={updateLabel}
+                          updateField={updateField}
+                          updateValidation={updateValidation}
+                          addOption={addOption}
+                          updateOption={updateOption}
+                          removeOption={removeOption}
+                          onDragStart={onDragStart}
+                          onDragOver={onDragOver}
+                          onDrop={onDrop}
+                          onDragEnd={onDragEnd}
+                        />
+                      )}
+                    </For>
+                    <Show when={fields.length === 0}>
+                      <div class="border-2 border-dashed border-gray-200 rounded-xl py-10 flex flex-col items-center justify-center text-center">
+                        <div class="w-10 h-10 bg-gray-100 rounded-2xl flex items-center justify-center mb-3">
+                          <Fa icon={solidIcons.faTag} class="text-gray-300" />
+                        </div>
+                        <p class="text-sm font-semibold text-gray-400">
+                          Belum ada field
+                        </p>
+                        <p class="text-xs text-gray-300 mt-0.5">
+                          Klik "Tambah Field" untuk mulai
+                        </p>
                       </div>
-                      <p class="text-sm font-semibold text-gray-400">Belum ada field</p>
-                      <p class="text-xs text-gray-300 mt-0.5">
-                        Klik "Tambah Field" untuk mulai
-                      </p>
-                    </div>
-                  </Show>
-                </div>
-              }>
+                    </Show>
+                  </div>
+                }
+              >
                 <Skeleton />
               </Show>
             </div>
@@ -1260,18 +1264,20 @@ const ManageBusiness: Component = () => {
                 </button>
               </div>
 
-              <Show
-                when={numericFields().length < 2 && formulas.length === 0}
-              >
+              <Show when={numericFields().length < 2 && formulas.length === 0}>
                 <div class="border-2 border-dashed border-violet-100 rounded-xl py-8 flex flex-col items-center justify-center text-center">
                   <div class="w-10 h-10 bg-violet-50 rounded-2xl flex items-center justify-center mb-3">
-                    <Fa icon={solidIcons.faCalculator} class="text-violet-300" />
+                    <Fa
+                      icon={solidIcons.faCalculator}
+                      class="text-violet-300"
+                    />
                   </div>
                   <p class="text-sm font-semibold text-gray-400">
                     Butuh minimal 2 field angka
                   </p>
                   <p class="text-xs text-gray-300 mt-0.5 max-w-[200px]">
-                    Tambahkan field bertipe Angka atau Mata Uang di tab Field Transaksi
+                    Tambahkan field bertipe Angka atau Mata Uang di tab Field
+                    Transaksi
                   </p>
                 </div>
               </Show>
@@ -1289,7 +1295,9 @@ const ManageBusiness: Component = () => {
                   )}
                 </For>
 
-                <Show when={formulas.length === 0 && numericFields().length >= 2}>
+                <Show
+                  when={formulas.length === 0 && numericFields().length >= 2}
+                >
                   <div class="border-2 border-dashed border-violet-100 rounded-xl py-8 flex flex-col items-center justify-center text-center">
                     <div class="w-10 h-10 bg-violet-50 rounded-2xl flex items-center justify-center mb-3">
                       <Fa
@@ -1361,7 +1369,9 @@ const ManageBusiness: Component = () => {
             </div>
 
             <div class="mx-5 mb-4 px-3 py-2 bg-gray-50 rounded-xl border border-gray-200">
-              <p class="text-xs text-gray-400 mb-0.5">Usaha yang akan dihapus:</p>
+              <p class="text-xs text-gray-400 mb-0.5">
+                Usaha yang akan dihapus:
+              </p>
               <p class="text-sm font-bold text-gray-700 capitalize">
                 {params.slug.replace(/-/g, " ")}
               </p>
@@ -1382,7 +1392,10 @@ const ManageBusiness: Component = () => {
                 onClick={handleDelete}
               >
                 <Show when={isDeleting()}>
-                  <Fa icon={solidIcons.faSpinner} class="animate-spin text-xs" />
+                  <Fa
+                    icon={solidIcons.faSpinner}
+                    class="animate-spin text-xs"
+                  />
                 </Show>
                 {isDeleting() ? "Menghapus..." : "Ya, Hapus"}
               </button>
